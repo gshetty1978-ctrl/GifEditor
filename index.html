@@ -122,6 +122,10 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
 
     <div class="sec" id="sel-panel" style="display:none">
       <h3 style="color:var(--accent)">Selected <span id="sel-kind" style="text-transform:none;color:var(--muted);font-weight:400"></span></h3>
+      <div class="grid2" style="margin-bottom:6px">
+        <button id="sel-undo" title="Undo (Ctrl+Z)">↶ Undo</button>
+        <button id="sel-redo" title="Redo (Ctrl+Y)">↷ Redo</button>
+      </div>
       <div class="grid3">
         <button id="sel-front" title="Bring to front">⬆ Front</button>
         <button id="sel-back" title="Send to back">⬇ Back</button>
@@ -395,7 +399,7 @@ function drawSelection() {
 
 /* ---------------------------------------------------------------- history */
 function pushHistory() {
-  undoStack.push({ i: cur, data: fctx().getImageData(0, 0, W, H), objs: cloneObjs(F().objs) });
+  undoStack.push({ i: cur, sel, data: fctx().getImageData(0, 0, W, H), objs: cloneObjs(F().objs) });
   if (undoStack.length > HISTORY_MAX) undoStack.shift();
   redoStack.length = 0;
   updateHistoryButtons();
@@ -404,19 +408,21 @@ function applySnapshot(stack, other) {
   const s = stack.pop();
   if (!s || !frames[s.i]) return;
   const f = frames[s.i], c = f.cv.getContext('2d');
-  other.push({ i: s.i, data: c.getImageData(0, 0, W, H), objs: cloneObjs(f.objs) });
+  other.push({ i: s.i, sel, data: c.getImageData(0, 0, W, H), objs: cloneObjs(f.objs) });
   c.putImageData(s.data, 0, 0);
   f.objs = s.objs;
   cur = s.i;
-  sel = -1;
+  sel = (s.sel != null && s.sel < f.objs.length) ? s.sel : -1;
+  lastEdit = { key: null, t: 0 };
   refreshAll();
   updateHistoryButtons();
 }
 const undo = () => applySnapshot(undoStack, redoStack);
 const redo = () => applySnapshot(redoStack, undoStack);
 function updateHistoryButtons() {
-  $('btn-undo').disabled = !undoStack.length;
-  $('btn-redo').disabled = !redoStack.length;
+  const u = !undoStack.length, r = !redoStack.length;
+  $('btn-undo').disabled = $('sel-undo').disabled = u;
+  $('btn-redo').disabled = $('sel-redo').disabled = r;
 }
 
 /* -------------------------------------------------------------- timeline */
@@ -598,10 +604,16 @@ function syncSelPanel() {
   }
   syncing = false;
 }
-function editSel(fn) {
+let lastEdit = { key: null, t: 0 };
+function editSel(fn, key) {
   const o = selObj();
   if (!o || syncing) return false;
-  pushHistory();
+  // A slider drag or a burst of typing fires many input events; without this
+  // each one would eat a history slot and bury the state worth going back to.
+  const id = key ? key + ':' + cur + ':' + sel : null;
+  const now = Date.now();
+  if (!id || id !== lastEdit.key || now - lastEdit.t > 900) pushHistory();
+  lastEdit = { key: id, t: now };
   fn(o);
   if (o.type === 'text') measureObj(o);
   commit();
@@ -1213,15 +1225,17 @@ document.querySelectorAll('#stamps button').forEach(b => b.onclick = () => setTo
 
 $('mode-fill').onclick = () => { styleMode = 'fill'; $('mode-fill').classList.add('on'); $('mode-stroke').classList.remove('on'); editSel(o => o.mode = 'fill'); };
 $('mode-stroke').onclick = () => { styleMode = 'stroke'; $('mode-stroke').classList.add('on'); $('mode-fill').classList.remove('on'); editSel(o => o.mode = 'stroke'); };
-$('size').oninput = e => { $('size-val').textContent = e.target.value + 'px'; editSel(o => o.lw = +e.target.value); };
-$('alpha').oninput = e => { $('alpha-val').textContent = e.target.value + '%'; editSel(o => o.alpha = +e.target.value / 100); };
-$('color').oninput = e => editSel(o => o.color = e.target.value);
-$('text-input').oninput = e => editSel(o => { if (o.type === 'text') o.text = e.target.value || ' '; });
-$('font-size').oninput = e => editSel(o => { if (o.type === 'text') o.size = Math.max(6, +e.target.value || 48); });
+$('size').oninput = e => { $('size-val').textContent = e.target.value + 'px'; editSel(o => o.lw = +e.target.value, 'lw'); };
+$('alpha').oninput = e => { $('alpha-val').textContent = e.target.value + '%'; editSel(o => o.alpha = +e.target.value / 100, 'alpha'); };
+$('color').oninput = e => editSel(o => o.color = e.target.value, 'color');
+$('text-input').oninput = e => editSel(o => { if (o.type === 'text') o.text = e.target.value || ' '; }, 'text');
+$('font-size').oninput = e => editSel(o => { if (o.type === 'text') o.size = Math.max(6, +e.target.value || 48); }, 'fontsize');
 $('bold-btn').onclick = e => { bold = !bold; e.currentTarget.classList.toggle('on', bold); editSel(o => { if (o.type === 'text') o.bold = bold; }); };
 $('italic-btn').onclick = e => { italic = !italic; e.currentTarget.classList.toggle('on', italic); editSel(o => { if (o.type === 'text') o.italic = italic; }); };
 $('font-search').oninput = e => renderFonts(e.target.value.toLowerCase());
 
+$('sel-undo').onclick = undo;
+$('sel-redo').onclick = redo;
 $('sel-front').onclick = () => { const o = selObj(); if (!o) return; pushHistory(); F().objs.splice(sel, 1); F().objs.push(o); sel = F().objs.length - 1; commit(); };
 $('sel-back').onclick = () => { const o = selObj(); if (!o) return; pushHistory(); F().objs.splice(sel, 1); F().objs.unshift(o); sel = 0; commit(); };
 $('sel-dup').onclick = duplicateSelection;
