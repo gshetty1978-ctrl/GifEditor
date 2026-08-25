@@ -415,7 +415,7 @@ function setTool(t, sh) {
 }
 
 /* ------------------------------------------------------------ pointer ops */
-let drawing = false, start = null, snapshot = null, shiftKey = false;
+let drawing = false, moved = false, start = null, snapshot = null, shiftKey = false;
 
 function pos(e) {
   const r = view.getBoundingClientRect();
@@ -444,6 +444,7 @@ view.addEventListener('pointerdown', e => {
   if (tool === 'text') { stampText(p); commit(); return; }
 
   drawing = true;
+  moved = false;
   start = p;
   snapshot = c.getImageData(0, 0, W, H);
 
@@ -467,6 +468,7 @@ view.addEventListener('pointermove', e => {
     return;
   }
   const c = fctx();
+  moved = true;
   if (tool === 'brush' || tool === 'eraser') {
     c.lineTo(p.x, p.y);
     c.stroke();
@@ -483,6 +485,11 @@ window.addEventListener('pointerup', () => {
   if (!drawing) return;
   drawing = false;
   const c = fctx();
+  if (!moved && shape) {          // plain click = stamp at the slider size
+    c.putImageData(snapshot, 0, 0);
+    paintStyle(c);
+    drawShape(c, shape, start.x, start.y, +$('size').value * 3.2);
+  }
   c.globalCompositeOperation = 'source-over';
   c.globalAlpha = 1;
   commit();
