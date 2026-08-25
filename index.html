@@ -982,9 +982,15 @@ function buildPalette(imgs, maxColors, transparent) {
     b.list.sort((p, q) => p[key] - q[key]);
     let half = b.count / 2, acc = 0, idx = 0;
     for (; idx < b.list.length - 1; idx++) { acc += b.list[idx].count; if (acc >= half) break; }
+    // A single colour can own more than half the pixels - a flat background is
+    // the normal case. The count median then lands past the end of the list,
+    // the right-hand box comes out empty, and averaging it gives NaN. That
+    // burns a palette slot, and repeated often enough it leaves almost no
+    // valid entries, so every real colour snaps onto the few survivors.
+    if (idx > b.list.length - 2) idx = b.list.length - 2;
     boxes.splice(bi, 1, mkBox(b.list.slice(0, idx + 1)), mkBox(b.list.slice(idx + 1)));
   }
-  return boxes.map(b => {
+  return boxes.filter(b => b.list.length).map(b => {
     let r = 0, g = 0, bl = 0, n = 0;
     for (const e of b.list) { r += e.r * e.count; g += e.g * e.count; bl += e.b * e.count; n += e.count; }
     return [Math.round(r / n), Math.round(g / n), Math.round(bl / n)];
