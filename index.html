@@ -117,6 +117,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-size:12px;line-height:1;cursor:pointer;border-radius:4px;flex:0 0 auto}
 .layer-row .mini:hover{background:#39415a}
 .layer-row .off{opacity:.38}
+#restore-bar{display:none;align-items:center;gap:10px;margin:0 12px;padding:9px 12px;font-size:13px;
+  background:#1e2a1f;border:1px solid #2f5133;border-left:3px solid var(--good);border-radius:8px}
+#restore-bar .grow{flex:1}
+#restore-bar button{padding:6px 10px}
+.saving{color:var(--muted);font-size:11.5px;margin-left:auto;white-space:nowrap}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 /* small screens: keep every control reachable and tappable */
@@ -145,6 +150,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 <header>
   <h1>🎞️ Frame Studio</h1>
   <span class="badge">offline · no libraries</span>
+  <span class="saving" id="save-state"></span>
   <div class="spacer"></div>
   <button id="btn-undo" title="Undo (Ctrl+Z)">↶ Undo</button>
   <button id="btn-redo" title="Redo (Ctrl+Y)">↷ Redo</button>
@@ -153,6 +159,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <button id="btn-load-proj">📂 Open project</button>
   <button id="btn-export" class="violet">💾 Export GIF</button>
 </header>
+
+<div id="restore-bar">
+  <span class="grow" id="restore-text">Unsaved work from a previous session was found.</span>
+  <button id="restore-yes" class="green">Restore</button>
+  <button id="restore-no">Discard</button>
+</div>
 
 <div class="wrap">
 
@@ -206,7 +218,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <div class="grid3">
         <button id="sel-front" title="Bring to front">⬆ Front</button>
         <button id="sel-back" title="Send to back">⬇ Back</button>
-        <button id="sel-dup" title="Duplicate (Ctrl+D)">⧉ Copy</button>
+        <button id="sel-dup" title="Duplicate in place (Ctrl+D)">⧉ Dup</button>
+      </div>
+      <div class="grid2" style="margin-top:6px">
+        <button id="sel-copy" title="Copy to clipboard (Ctrl+C)">&#128203; Copy</button>
+        <button id="sel-paste" title="Paste into this frame (Ctrl+V)">&#128204; Paste</button>
       </div>
       <div class="grid2" style="margin-top:6px">
         <button id="sel-reset" title="Reset rotation">↺ 0°</button>
@@ -258,6 +274,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <span style="width:1px;height:22px;background:var(--line)"></span>
       <button id="btn-tween" title="Insert interpolated frames between this frame and the next">&#8669; Tween</button>
       <input type="number" id="tween-n" value="4" min="1" max="60" style="width:56px" title="How many in-between frames">
+      <select id="tween-ease" style="width:104px" title="How the motion is paced">
+        <option value="linear">Linear</option>
+        <option value="in">Ease in</option>
+        <option value="out">Ease out</option>
+        <option value="inout">Ease in-out</option>
+      </select>
     </div>
 
     <div class="viewport" id="viewport">
@@ -291,6 +313,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       </select>
       <p class="note">Existing frames are rescaled.</p>
       <label class="row" style="margin-top:8px">Checkerboard <input type="checkbox" id="show-checker" checked></label>
+      <label class="row">Onion depth <input type="number" id="onion-depth" value="1" min="1" max="4" style="width:64px"></label>
     </div>
     <div class="sec">
       <h3>Layers</h3>
@@ -357,6 +380,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
         <kbd>←</kbd><kbd>→</kbd> move selection / change frame<br>
         <kbd>Del</kbd> delete selection, else the frame · <kbd>Esc</kbd> deselect<br>
         <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo / redo<br>
+        <kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>Ctrl</kbd>+<kbd>V</kbd> copy / paste a shape<br>
         <kbd>Shift</kbd> while dragging = straight / square / uniform
       </div>
     </div>
@@ -386,6 +410,7 @@ let selectedFont = 'Arial', bold = false, italic = false;
 let dirty = false, syncing = false;
 let ref = null;   // tracing underlay: {img, alpha, zoom, fit, x, y, visible, move, locked}
 let zoom = 1;
+let onionDepth = 1;
 
 /* Canvas units per CSS pixel. Handle sizes and grab tolerances are drawn and
    tested in canvas units, but they need to stay a constant size on screen -
@@ -550,8 +575,12 @@ function repaint(ghost) {
     vctx.globalAlpha = 1;
   }
   if (onion && !playing) {
-    if (frames[cur - 1]) { vctx.globalAlpha = .28; renderFrame(vctx, frames[cur - 1]); }
-    if (frames[cur + 1]) { vctx.globalAlpha = .16; renderFrame(vctx, frames[cur + 1]); }
+    // furthest first so nearer ghosts sit on top, fading with distance
+    for (let d = onionDepth; d >= 1; d--) {
+      const fade = 1 / (d + 0.6);
+      if (frames[cur - d]) { vctx.globalAlpha = 0.34 * fade; renderFrame(vctx, frames[cur - d]); }
+      if (frames[cur + d]) { vctx.globalAlpha = 0.20 * fade; renderFrame(vctx, frames[cur + d]); }
+    }
     vctx.globalAlpha = 1;
   }
   renderFrame(vctx, F());
@@ -913,6 +942,12 @@ function mergeDown() {
 
 /* ----------------------------------------------------------------- tween */
 const lerp = (a, b, t) => a + (b - a) * t;
+const EASE = {
+  linear: t => t,
+  in: t => t * t,
+  out: t => 1 - (1 - t) * (1 - t),
+  inout: t => (t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t))
+};
 function lerpAngle(a, b, t) {
   let d = (b || 0) - (a || 0);
   while (d > Math.PI) d -= Math.PI * 2;    // always take the short way round
@@ -956,8 +991,9 @@ function tween(steps) {
   }
   pushStruct();
   const made = [];
+  const ease = EASE[$('tween-ease').value] || EASE.linear;
   for (let i = 1; i <= steps; i++) {
-    const t = i / (steps + 1);
+    const t = ease(i / (steps + 1));
     const f = { layers: [], active: A.active, delay: A.delay };
     A.layers.forEach((al, li) => {
       const nl = cloneLayer(al, true);       // pixels are carried, not interpolated
@@ -977,7 +1013,8 @@ function tween(steps) {
   sel = -1; dirty = true;
   renderTimeline(); refreshAll();
   toast('Inserted ' + steps + ' tweened frame' + (steps === 1 ? '' : 's') +
-        ', interpolating ' + matches + ' object' + (matches === 1 ? '' : 's') + '.', 'good');
+        ' (' + $('tween-ease').selectedOptions[0].text.toLowerCase() + '), interpolating ' +
+        matches + ' object' + (matches === 1 ? '' : 's') + '.', 'good');
 }
 
 /* ------------------------------------------------------------- playback */
@@ -1559,24 +1596,52 @@ async function exportGIF() {
   out.b(0x21); out.b(0xFF); out.b(11); out.s('NETSCAPE2.0');
   out.b(3); out.b(1); out.w($('loop-forever').checked ? 0 : 1); out.b(0);
 
+  /* A GIF frame is a patch over its predecessor. When the frames are opaque we
+     can therefore ship only the rectangle that actually changed and leave the
+     rest standing, which on an animation with a static background is most of
+     the file. Transparent output keeps whole frames, because it needs disposal
+     2 to clear between them and that would wipe the parts we skipped. */
+  const diffing = !transparent && imgs.length > 1;
+  let fullBytes = 0, sentBytes = 0;
   for (let i = 0; i < imgs.length; i++) {
     progress(.25 + .7 * i / imgs.length, 'Encoding frame ' + (i + 1) + '/' + imgs.length + '…');
     await maybeYield();
     const d = imgs[i].data;
-    const px = new Uint8Array(ow * oh);
-    for (let j = 0, k = 0; j < d.length; j += 4, k++) {
-      px[k] = (transparent && d[j + 3] < 128) ? transIdx : mapTo(d[j], d[j + 1], d[j + 2]);
+    let x0 = 0, y0 = 0, x1 = ow - 1, y1 = oh - 1;
+    if (diffing && i > 0) {
+      const prev = imgs[i - 1].data;
+      x0 = ow; y0 = oh; x1 = -1; y1 = -1;
+      for (let y = 0, k = 0; y < oh; y++) {
+        for (let x = 0; x < ow; x++, k += 4) {
+          if (d[k] === prev[k] && d[k + 1] === prev[k + 1] && d[k + 2] === prev[k + 2]) continue;
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+      if (x1 < 0) { x0 = y0 = 0; x1 = y1 = 0; }   // identical frame: a 1x1 no-op patch
     }
+    const pw = x1 - x0 + 1, ph = y1 - y0 + 1;
+    const px = new Uint8Array(pw * ph);
+    for (let y = 0, k = 0; y < ph; y++) {
+      let j = ((y + y0) * ow + x0) * 4;
+      for (let x = 0; x < pw; x++, k++, j += 4) {
+        px[k] = (transparent && d[j + 3] < 128) ? transIdx : mapTo(d[j], d[j + 1], d[j + 2]);
+      }
+    }
+    fullBytes += ow * oh; sentBytes += pw * ph;
     const delay = Math.max(2, Math.round(frames[i].delay / 10));
     out.b(0x21); out.b(0xF9); out.b(4);
     out.b(((transparent ? 2 : 1) << 2) | (transparent ? 1 : 0));
     out.w(delay);
     out.b(transparent ? transIdx : 0);
     out.b(0);
-    out.b(0x2C); out.w(0); out.w(0); out.w(ow); out.w(oh); out.b(0);
+    out.b(0x2C); out.w(x0); out.w(y0); out.w(pw); out.w(ph); out.b(0);
     out.b(minCodeSize);
     subBlocks(out, lzw(minCodeSize, px));
   }
+  lastExportSaving = fullBytes ? 1 - sentBytes / fullBytes : 0;
   out.b(0x3B);
 
   progress(.99, 'Saving…');
@@ -1586,11 +1651,13 @@ async function exportGIF() {
   sel = keep;
   repaint();
   toast('Saved animation.gif — ' + (blob.size / 1024).toFixed(0) + ' KB, ' + frames.length +
-        (frames.length === 1 ? ' frame.' : ' frames.'), 'good');
+        (frames.length === 1 ? ' frame.' : ' frames.') +
+        (lastExportSaving > 0.02 ? ' Shipped ' + Math.round(lastExportSaving * 100) + '% fewer pixels by sending only what changed.' : ''), 'good');
   flash('Export complete.');
   dirty = false;
 }
 
+let lastExportSaving = 0;
 const tick = () => new Promise(r => setTimeout(r, 0));
 /* Yield to the browser only when we have actually held the thread a while.
    Yielding once per frame is wasteful, and a backgrounded tab throttles
@@ -1866,6 +1933,132 @@ async function importGIF(file) {
         ' from ' + file.name + ' (' + gif.width + '\u00d7' + gif.height + ').', 'good');
 }
 
+/* -------------------------------------------------------------- autosave */
+/* The work lives only in this tab until it is exported or saved, so a stray
+   close used to lose everything. Snapshot the project into IndexedDB after
+   edits settle, and offer it back on the next visit. */
+const DB_NAME = 'frame-studio', STORE = 'autosave', SLOT = 'current';
+let dbPromise = null, saveTimer = null, saving = false, saveQueued = false;
+
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((res, rej) => {
+    const rq = indexedDB.open(DB_NAME, 1);
+    rq.onupgradeneeded = () => {
+      if (!rq.result.objectStoreNames.contains(STORE)) rq.result.createObjectStore(STORE);
+    };
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error);
+  }).catch(err => { dbPromise = null; throw err; });
+  return dbPromise;
+}
+function idb(mode, fn) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(STORE, mode);
+    const rq = fn(tx.objectStore(STORE));
+    tx.oncomplete = () => res(rq && rq.result);
+    tx.onerror = () => rej(tx.error);
+    tx.onabort = () => rej(tx.error);
+  }));
+}
+
+function projectData() {
+  return {
+    v: 3, w: W, h: H,
+    frames: frames.map(f => ({
+      delay: f.delay, active: f.active,
+      layers: f.layers.map(l => ({
+        name: l.name, visible: l.visible, locked: l.locked, opacity: l.opacity,
+        objs: l.objs, png: l.cv.toDataURL('image/png')
+      }))
+    }))
+  };
+}
+function saveState(msg) { $('save-state').textContent = msg || ''; }
+
+async function autosaveNow() {
+  if (saving) { saveQueued = true; return; }
+  saving = true;
+  try {
+    saveState('Saving…');
+    const doc = { at: Date.now(), frames: frames.length, data: projectData() };
+    await idb('readwrite', st => st.put(doc, SLOT));
+    const t = new Date();
+    saveState('Saved ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'));
+  } catch (err) {
+    console.error(err);
+    saveState('Autosave unavailable');       // private windows and full disks land here
+  } finally {
+    saving = false;
+    if (saveQueued) { saveQueued = false; scheduleAutosave(0); }
+  }
+}
+function scheduleAutosave(ms) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(autosaveNow, ms == null ? 4000 : ms);
+}
+/* Every mutating path already sets dirty, so watch that rather than
+   sprinkling save calls through thirty call sites. */
+let wasDirty = false;
+setInterval(() => {
+  if (dirty && !wasDirty) scheduleAutosave();
+  wasDirty = dirty;
+}, 700);
+document.addEventListener('visibilitychange', () => { if (document.hidden && dirty) autosaveNow(); });
+window.addEventListener('pagehide', () => { if (dirty) autosaveNow(); });
+
+function applyProject(data, done) {
+  resize(data.w || 500, data.h || 500, false);
+  undoStack.length = redoStack.length = 0;
+  updateHistoryButtons();
+  frames.length = 0;
+  const shaped = data.frames.map(fd => Array.isArray(fd.layers)
+    ? fd
+    : { delay: fd.delay, active: 0, layers: [{ name: 'Layer 1', visible: true, locked: false, opacity: 1, objs: fd.objs, png: fd.png }] });
+  let pending = shaped.reduce((n, fd) => n + fd.layers.length, 0);
+  shaped.forEach((fd, i) => {
+    const f = newFrame(fd.delay);
+    f.active = fd.active || 0;
+    f.layers = fd.layers.map(ld => {
+      const l = newLayer(ld.name);
+      l.visible = ld.visible !== false;
+      l.locked = !!ld.locked;
+      l.opacity = typeof ld.opacity === 'number' ? ld.opacity : 1;
+      l.objs = (Array.isArray(ld.objs) ? ld.objs : []).map(o => Object.assign({ id: nextObjId() }, o));
+      return l;
+    });
+    frames[i] = f;
+    fd.layers.forEach((ld, li) => {
+      const img = new Image();
+      const settle = () => { if (--pending === 0) { cur = 0; sel = -1; renderTimeline(); refreshAll(); if (zoomIsFit) zoomFit(); if (done) done(); } };
+      img.onload = () => { f.layers[li].cv.getContext('2d').drawImage(img, 0, 0); settle(); };
+      img.onerror = settle;
+      img.src = ld.png;
+    });
+  });
+}
+
+async function offerRestore() {
+  let doc;
+  try { doc = await idb('readonly', st => st.get(SLOT)); }
+  catch { return; }
+  if (!doc || !doc.data || !doc.data.frames || !doc.data.frames.length) return;
+  const when = new Date(doc.at);
+  $('restore-text').textContent =
+    'Unsaved work from ' + when.toLocaleString() + ' — ' +
+    doc.frames + (doc.frames === 1 ? ' frame' : ' frames') + '. Restore it?';
+  $('restore-bar').style.display = 'flex';
+  $('restore-yes').onclick = () => {
+    $('restore-bar').style.display = 'none';
+    applyProject(doc.data, () => toast('Restored ' + frames.length + ' frames from autosave.', 'good'));
+  };
+  $('restore-no').onclick = async () => {
+    $('restore-bar').style.display = 'none';
+    try { await idb('readwrite', st => st.delete(SLOT)); } catch {}
+    toast('Autosave discarded.');
+  };
+}
+
 /* ------------------------------------------------------------ import/save */
 function importImages(files) {
   const list = [...files];
@@ -1911,6 +2104,8 @@ function saveProject() {
   download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'frame-studio-project.json');
   dirty = false;
   toast('Project saved.', 'good');
+  idb('readwrite', st => st.delete(SLOT)).catch(() => {});
+  saveState('');
 }
 function loadProject(file) {
   const fr = new FileReader();
@@ -2040,9 +2235,29 @@ $('sel-redo').onclick = redo;
 $('sel-front').onclick = () => { const o = selObj(); if (!o) return; pushHistory(); L().objs.splice(sel, 1); L().objs.push(o); sel = L().objs.length - 1; commit(); };
 $('sel-back').onclick = () => { const o = selObj(); if (!o) return; pushHistory(); L().objs.splice(sel, 1); L().objs.unshift(o); sel = 0; commit(); };
 $('sel-dup').onclick = duplicateSelection;
+$('sel-copy').onclick = copySelection;
+$('sel-paste').onclick = pasteSelection;
 $('sel-reset').onclick = () => editSel(o => o.rot = 0);
 $('sel-del').onclick = deleteSelection;
 
+let objClip = null;
+function copySelection() {
+  const o = selObj();
+  if (!o) { toast('Select a shape or text first.', 'bad'); return; }
+  objClip = Object.assign({}, o);
+  toast('Copied ' + (o.type === 'text' ? 'text' : o.kind) + '.');
+}
+function pasteSelection() {
+  if (!objClip) { toast('Nothing copied yet.', 'bad'); return; }
+  if (L().locked) { toast(L().name + ' is locked.', 'bad'); return; }
+  pushHistory();
+  const c = Object.assign({}, objClip, { id: nextObjId() });
+  L().objs.push(c);
+  sel = L().objs.length - 1;
+  setTool('select');
+  commit(); syncSelPanel();
+  toast('Pasted onto ' + L().name + '.');
+}
 function duplicateSelection() {
   const o = selObj();
   if (!o) return;
@@ -2173,6 +2388,11 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(() => { if (zoomIsFit) zoomFit(); }, 150);
 });
 $('show-checker').onchange = e => $('shell').classList.toggle('flat', !e.target.checked);
+$('onion-depth').onchange = e => {
+  onionDepth = Math.max(1, Math.min(4, +e.target.value || 1));
+  e.target.value = onionDepth;
+  repaint();
+};
 
 $('lay-add').onclick = addLayer;
 $('lay-dup').onclick = duplicateLayer;
@@ -2238,6 +2458,8 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'd') { e.preventDefault(); duplicateSelection(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'c') { e.preventDefault(); copySelection(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'v') { e.preventDefault(); pasteSelection(); return; }
   if (e.ctrlKey || e.metaKey) return;
   if (e.key === 'Escape') { sel = -1; syncSelPanel(); repaint(); return; }
   if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIsFit = false; setZoom(zoom * 1.25); return; }
@@ -2276,6 +2498,7 @@ setTool('brush');
 refreshAll();
 applyZoom();
 zoomFit();
+offerRestore();
 </script>
 </body>
 </html>
