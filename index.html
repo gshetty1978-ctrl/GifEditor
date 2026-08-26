@@ -202,6 +202,25 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
       <p class="note">Existing frames are rescaled.</p>
     </div>
     <div class="sec">
+      <h3>Reference image</h3>
+      <button id="ref-load" style="width:100%">&#128206; Load reference&#8230;</button>
+      <div id="ref-controls" style="display:none">
+        <label class="row">Opacity <span id="ref-alpha-val" style="color:var(--text)">40%</span></label>
+        <input type="range" id="ref-alpha" min="5" max="100" value="40">
+        <label class="row">Size <span id="ref-zoom-val" style="color:var(--text)">100%</span></label>
+        <input type="range" id="ref-zoom" min="10" max="400" value="100">
+        <div class="grid2" style="margin-top:6px">
+          <button id="ref-move">&#10021; Move</button>
+          <button id="ref-show" class="on">&#128065; Shown</button>
+        </div>
+        <div class="grid2" style="margin-top:6px">
+          <button id="ref-fit">&#10530; Fit</button>
+          <button id="ref-clear" class="danger">&#10005; Remove</button>
+        </div>
+        <p class="note">Sits behind your drawing as a tracing guide. Never appears in the exported GIF.</p>
+      </div>
+    </div>
+    <div class="sec">
       <h3>Export</h3>
       <label class="row">Background <input type="color" id="bg-color" value="#ffffff"></label>
       <label class="row">Transparent <input type="checkbox" id="bg-transparent"></label>
@@ -232,6 +251,7 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
 
 <input type="file" id="file-img" accept="image/*" multiple hidden>
 <input type="file" id="file-proj" accept="application/json,.json" hidden>
+<input type="file" id="file-ref" accept="image/*" hidden>
 
 <script>
 "use strict";
@@ -247,6 +267,7 @@ let tool = 'brush', shape = null, styleMode = 'fill';
 let playing = false, playTimer = null, onion = false;
 let selectedFont = 'Arial', bold = false, italic = false;
 let dirty = false, syncing = false;
+let ref = null;   // tracing underlay: {img, alpha, zoom, fit, x, y, visible, move}
 
 const undoStack = [], redoStack = [], HISTORY_MAX = 30;
 const measure = document.createElement('canvas').getContext('2d');
@@ -362,6 +383,12 @@ function repaint(ghost) {
   if (!$('bg-transparent').checked) {
     vctx.fillStyle = $('bg-color').value;
     vctx.fillRect(0, 0, W, H);
+  }
+  if (ref && ref.img && ref.visible) {
+    vctx.globalAlpha = ref.alpha;
+    const s = ref.fit * ref.zoom;
+    vctx.drawImage(ref.img, ref.x, ref.y, ref.img.width * s, ref.img.height * s);
+    vctx.globalAlpha = 1;
   }
   if (onion && !playing) {
     if (frames[cur - 1]) { vctx.globalAlpha = .28; renderFrame(vctx, frames[cur - 1]); }
@@ -567,6 +594,7 @@ function setTool(t, sh) {
   const btn = document.querySelector(sh ? '#stamps [data-shape="' + sh + '"]' : '#tools [data-tool="' + t + '"]');
   if (btn) btn.classList.add('on');
   if (t !== 'select') sel = -1;
+  if (ref && ref.move) { ref.move = false; $('ref-move').classList.remove('on'); }
   $('text-panel').style.display = (t === 'text' || (t === 'select' && selObj() && selObj().type === 'text')) ? '' : 'none';
   const msgs = {
     select: 'Select — click a shape or text to move, resize or rotate it.',
@@ -649,6 +677,13 @@ view.addEventListener('pointerdown', e => {
   shiftKey = e.shiftKey;
   moved = false;
   start = p;
+
+  if (ref && ref.move && ref.img) {          // panning the guide, not drawing
+    drawing = true;
+    mode = 'ref';
+    grab = { x: ref.x, y: ref.y, px: p.x, py: p.y };
+    return;
+  }
 
   if (tool === 'eyedrop') { pickColor(p); return; }
 
@@ -733,7 +768,11 @@ view.addEventListener('pointermove', e => {
   moved = true;
   const o = selObj();
 
-  if (mode === 'move' && o) {
+  if (mode === 'ref' && ref) {
+    ref.x = grab.x + (p.x - grab.px);
+    ref.y = grab.y + (p.y - grab.py);
+    repaint();
+  } else if (mode === 'move' && o) {
     o.x = grab.x + (p.x - grab.px);
     o.y = grab.y + (p.y - grab.py);
     repaint();
@@ -778,6 +817,7 @@ view.addEventListener('pointermove', e => {
 window.addEventListener('pointerup', () => {
   if (!drawing) return;
   drawing = false;
+  if (mode === 'ref') { mode = null; grab = null; repaint(); return; }
   const wasCreate = mode === 'create';
   mode = null; grab = null;
   const c = fctx();
@@ -1181,6 +1221,7 @@ function resize(nw, nh, rescale = true) {
     });
   });
   W = view.width = nw; H = view.height = nh;
+  if (ref && ref.img) refFit();
   undoStack.length = redoStack.length = 0;
   sel = -1;
   updateHistoryButtons();
@@ -1265,6 +1306,83 @@ function deleteSelection() {
   sel = -1;
   commit(); syncSelPanel();
 }
+
+/* -------------------------------------------------------- reference image */
+/* A tracing guide drawn behind the artwork. It lives outside the frame model
+   on purpose: export, thumbnails and the colour picker all go through
+   renderFrame(), which never sees it. */
+function refFit() {
+  if (!ref || !ref.img) return;
+  ref.fit = Math.min(W / ref.img.width, H / ref.img.height);
+  ref.zoom = 1;
+  $('ref-zoom').value = 100;
+  $('ref-zoom-val').textContent = '100%';
+  refCentre();
+}
+function refCentre() {
+  const s = ref.fit * ref.zoom;
+  ref.x = (W - ref.img.width * s) / 2;
+  ref.y = (H - ref.img.height * s) / 2;
+}
+function refZoom(pct) {
+  if (!ref || !ref.img) return;
+  const s0 = ref.fit * ref.zoom;
+  const cx = ref.x + ref.img.width * s0 / 2, cy = ref.y + ref.img.height * s0 / 2;
+  ref.zoom = pct / 100;
+  const s1 = ref.fit * ref.zoom;
+  ref.x = cx - ref.img.width * s1 / 2;      // zoom about the centre, not the corner
+  ref.y = cy - ref.img.height * s1 / 2;
+  $('ref-zoom-val').textContent = pct + '%';
+  repaint();
+}
+function refSetMove(on) {
+  if (!ref) return;
+  ref.move = on;
+  $('ref-move').classList.toggle('on', on);
+  if (on) {
+    view.style.cursor = 'move';
+    $('hint').textContent = 'Move mode - drag the canvas to position the reference. Click Move again to draw.';
+  } else setTool(tool, shape);
+}
+function refClear() {
+  if (ref && ref.img && ref.img.src.startsWith('blob:')) URL.revokeObjectURL(ref.img.src);
+  ref = null;
+  $('ref-controls').style.display = 'none';
+  $('ref-load').textContent = '\u{1F4CE} Load reference\u2026';
+  setTool(tool, shape);
+  repaint();
+}
+function refLoad(file) {
+  const img = new Image();
+  img.onload = () => {
+    ref = { img, alpha: +$('ref-alpha').value / 100, zoom: 1, fit: 1, x: 0, y: 0, visible: true, move: false };
+    refFit();
+    $('ref-controls').style.display = '';
+    $('ref-load').textContent = '\u{1F4CE} Replace reference\u2026';
+    $('ref-show').classList.add('on');
+    $('ref-show').textContent = '\u{1F441} Shown';
+    $('ref-move').classList.remove('on');
+    repaint();
+    flash('Reference loaded - trace over it, it stays out of the export.');
+  };
+  img.onerror = () => flash('Could not read that image.');
+  img.src = URL.createObjectURL(file);
+}
+
+$('ref-load').onclick = () => $('file-ref').click();
+$('file-ref').onchange = e => { if (e.target.files[0]) refLoad(e.target.files[0]); e.target.value = ''; };
+$('ref-alpha').oninput = e => { $('ref-alpha-val').textContent = e.target.value + '%'; if (ref) { ref.alpha = +e.target.value / 100; repaint(); } };
+$('ref-zoom').oninput = e => refZoom(+e.target.value);
+$('ref-fit').onclick = () => { if (ref) { refFit(); repaint(); } };
+$('ref-move').onclick = () => refSetMove(!(ref && ref.move));
+$('ref-show').onclick = e => {
+  if (!ref) return;
+  ref.visible = !ref.visible;
+  e.currentTarget.classList.toggle('on', ref.visible);
+  e.currentTarget.textContent = ref.visible ? '\u{1F441} Shown' : '\u{1F6AB} Hidden';
+  repaint();
+};
+$('ref-clear').onclick = refClear;
 
 $('btn-add').onclick = addFrame;
 $('btn-dup').onclick = duplicateFrame;
