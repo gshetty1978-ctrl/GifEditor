@@ -374,7 +374,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <label class="row">Transparent <input type="checkbox" id="bg-transparent"></label>
       <label class="row">Loop forever <input type="checkbox" id="loop-forever" checked></label>
       <label class="row">Max colors <select id="max-colors" style="width:96px">
-        <option>256</option><option>128</option><option>64</option><option>32</option>
+        <option>256</option><option>128</option><option>64</option><option>32</option><option>16</option><option>8</option>
       </select></label>
       <label class="row">Scale <select id="export-scale" style="width:96px">
         <option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option>
@@ -1595,6 +1595,9 @@ function subBlocks(out, bytes) {
 
 /* median-cut quantiser */
 function buildPalette(imgs, maxColors, transparent) {
+  // A palette needs at least two entries; anything less collapses the whole
+  // image onto one averaged colour, which looks like a solid block.
+  maxColors = Math.max(2, Math.min(256, maxColors | 0));
   const hist = new Map();
   for (const im of imgs) {
     const d = im.data;
@@ -1673,7 +1676,7 @@ async function exportGIF() {
   const scale = +$('export-scale').value;
   const ow = Math.max(1, Math.round(W * scale)), oh = Math.max(1, Math.round(H * scale));
   const transparent = $('bg-transparent').checked;
-  const maxColors = Math.min(256, +$('max-colors').value - (transparent ? 1 : 0));
+  const maxColors = Math.max(2, Math.min(256, (+$('max-colors').value || 256) - (transparent ? 1 : 0)));
 
   progress(0.02, 'Rendering frames…');
   lastYield = performance.now();
