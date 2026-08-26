@@ -106,6 +106,17 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .toast.bad{border-left-color:var(--bad)}
 
 .canvas-shell.flat{background-image:none;background-color:#12151c}
+.layer-list{display:flex;flex-direction:column;gap:3px;max-height:190px;overflow:auto;
+  border:1px solid var(--line);border-radius:8px;padding:4px;background:var(--panel2)}
+.layer-row{display:flex;align-items:center;gap:5px;padding:4px 5px;border-radius:6px;cursor:pointer;
+  border:1px solid transparent;font-size:12.5px}
+.layer-row:hover{background:#2a3040}
+.layer-row.on{background:#243352;border-color:var(--accent)}
+.layer-row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.layer-row .mini{width:22px;height:22px;min-height:22px;padding:0;border:none;background:none;
+  font-size:12px;line-height:1;cursor:pointer;border-radius:4px;flex:0 0 auto}
+.layer-row .mini:hover{background:#39415a}
+.layer-row .off{opacity:.38}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 /* small screens: keep every control reachable and tappable */
@@ -244,6 +255,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <button id="btn-play" class="primary">▶️ Play</button>
       <label class="row" style="margin:0">Delay <input type="number" id="delay" value="120" min="20" step="10" style="width:78px"> ms</label>
       <button id="btn-delay-all" title="Apply this delay to every frame">↔ all</button>
+      <span style="width:1px;height:22px;background:var(--line)"></span>
+      <button id="btn-tween" title="Insert interpolated frames between this frame and the next">&#8669; Tween</button>
+      <input type="number" id="tween-n" value="4" min="1" max="60" style="width:56px" title="How many in-between frames">
     </div>
 
     <div class="viewport" id="viewport">
@@ -278,6 +292,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <p class="note">Existing frames are rescaled.</p>
       <label class="row" style="margin-top:8px">Checkerboard <input type="checkbox" id="show-checker" checked></label>
     </div>
+    <div class="sec">
+      <h3>Layers</h3>
+      <div class="layer-list" id="layer-list"></div>
+      <div class="grid4" style="margin-top:6px">
+        <button id="lay-add" title="New layer above">&#65291;</button>
+        <button id="lay-dup" title="Duplicate this layer">&#10530;</button>
+        <button id="lay-up" title="Move layer up">&#11014;</button>
+        <button id="lay-down" title="Move layer down">&#11015;</button>
+      </div>
+      <div class="grid2" style="margin-top:6px">
+        <button id="lay-merge" title="Merge this layer into the one below">&#10515; Merge down</button>
+        <button id="lay-del" class="danger" title="Delete this layer">&#10005; Delete</button>
+      </div>
+      <input type="text" id="lay-name" placeholder="Layer name" style="margin-top:6px">
+      <label class="row">Opacity <span id="lay-op-val" style="color:var(--text)">100%</span></label>
+      <input type="range" id="lay-op" min="0" max="100" value="100">
+      <p class="note">Tools draw into the highlighted layer. Locked layers ignore every tool.</p>
+    </div>
+
     <div class="sec">
       <h3>Reference image</h3>
       <button id="ref-load" style="width:100%">&#128206; Load reference&#8230;</button>
@@ -376,13 +409,32 @@ function makeCanvas(w, h, readOften) {
   if (readOften) c.getContext('2d', { willReadFrequently: true });
   return c;
 }
+/* A layer is a raster plane plus the editable objects sitting on it - which is
+   exactly what a frame used to be. Frames now hold a stack of them. */
+let layerSeq = 0, objSeq = 0;
+function newLayer(name) {
+  return {
+    name: name || 'Layer ' + (++layerSeq),
+    cv: makeCanvas(W, H, true), objs: [],
+    visible: true, locked: false, opacity: 1
+  };
+}
 function newFrame(delay) {
-  return { cv: makeCanvas(W, H, true), objs: [], delay: delay || +$('delay').value || 120 };
+  return { layers: [newLayer()], active: 0, delay: delay || +$('delay').value || 120 };
 }
 const F = () => frames[cur];
-const fctx = () => frames[cur].cv.getContext('2d');
+const L = () => { const f = F(); return f.layers[Math.min(f.active, f.layers.length - 1)]; };
+const fctx = () => L().cv.getContext('2d');
 const cloneObjs = objs => objs.map(o => Object.assign({}, o));
-const selObj = () => (sel >= 0 ? F().objs[sel] : null);
+const selObj = () => (sel >= 0 ? L().objs[sel] : null);
+const nextObjId = () => ++objSeq;
+function cloneLayer(l, keepIds) {
+  const c = newLayer(l.name);
+  c.cv.getContext('2d').drawImage(l.cv, 0, 0);
+  c.objs = l.objs.map(o => Object.assign({}, o, keepIds ? {} : { id: nextObjId() }));
+  c.visible = l.visible; c.locked = l.locked; c.opacity = l.opacity;
+  return c;
+}
 
 /* ------------------------------------------------------------ object model */
 function objFont(o) {
@@ -423,7 +475,7 @@ function pathShape(c, kind, x, y, s) {
 }
 function drawObject(c, o) {
   c.save();
-  c.globalAlpha = o.alpha;
+  c.globalAlpha *= o.alpha;
   c.fillStyle = c.strokeStyle = o.color;
   c.translate(o.x, o.y);
   if (o.rot) c.rotate(o.rot);
@@ -454,7 +506,7 @@ function toWorld(o, lx, ly) {
   return { x: o.x + lx * Math.cos(a) - ly * Math.sin(a), y: o.y + lx * Math.sin(a) + ly * Math.cos(a) };
 }
 function hitTest(p) {
-  const objs = F().objs, u = perPx();
+  const objs = L().objs, u = perPx();
   const pad = 6 * u;              // forgiving edge
   const min = 11 * u;             // a tiny object still gets a grabbable box
   for (let i = objs.length - 1; i >= 0; i--) {
@@ -475,8 +527,14 @@ function handlePoints(o) {
 
 /* --------------------------------------------------------------- painting */
 function renderFrame(c, f) {
-  c.drawImage(f.cv, 0, 0);
-  f.objs.forEach(o => drawObject(c, o));
+  const base = c.globalAlpha;
+  for (const l of f.layers) {
+    if (!l.visible) continue;
+    c.globalAlpha = base * l.opacity;
+    c.drawImage(l.cv, 0, 0);
+    l.objs.forEach(o => drawObject(c, o));
+  }
+  c.globalAlpha = base;
 }
 function repaint(ghost) {
   vctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -571,7 +629,21 @@ function record(entry) {
    reference, not by index, so a later add/delete/reorder cannot silently
    redirect this entry at a different frame. */
 function pushHistory() {
-  record({ kind: 'frame', f: F(), sel, data: fctx().getImageData(0, 0, W, H), objs: cloneObjs(F().objs) });
+  record({ kind: 'layer', f: F(), layer: L(), sel, data: fctx().getImageData(0, 0, W, H), objs: cloneObjs(L().objs) });
+}
+/* Shape of one frame's layer stack. */
+function pushLayerStruct(key) {
+  const f = F();
+  const entry = {
+    kind: 'lstruct', f, active: f.active, sel,
+    list: f.layers.slice(),
+    props: f.layers.map(l => ({ l, name: l.name, visible: l.visible, locked: l.locked, opacity: l.opacity }))
+  };
+  // sliding a layer's opacity fires a stream of events; collapse them
+  const id = key ? key + ':' + frames.indexOf(f) + ':' + f.active : null;
+  const now = Date.now();
+  if (!id || id !== lastEdit.key || now - lastEdit.t > 900) record(entry);
+  lastEdit = { key: id, t: now };
 }
 /* Shape of the frame list itself. frames.slice() copies references only, so
    this is cheap and a deleted frame stays alive in the snapshot, pixels and
@@ -579,14 +651,32 @@ function pushHistory() {
 function pushStruct() {
   record({ kind: 'struct', cur, sel, list: frames.slice() });
 }
-function invertFrame(s) {
-  const f = s.f, c = f.cv.getContext('2d');
-  const back = { kind: 'frame', f, sel, data: c.getImageData(0, 0, W, H), objs: cloneObjs(f.objs) };
+function invertLayer(s) {
+  const l = s.layer, c = l.cv.getContext('2d');
+  const back = { kind: 'layer', f: s.f, layer: l, sel, data: c.getImageData(0, 0, W, H), objs: cloneObjs(l.objs) };
   c.putImageData(s.data, 0, 0);
-  f.objs = s.objs;
-  const idx = frames.indexOf(f);
+  l.objs = s.objs;
+  const idx = frames.indexOf(s.f);
   if (idx >= 0) cur = idx;               // frame may be absent if a delete is still pending
-  sel = (s.sel != null && s.sel < f.objs.length) ? s.sel : -1;
+  const li = s.f.layers.indexOf(l);
+  if (li >= 0) s.f.active = li;
+  sel = (s.sel != null && s.sel < l.objs.length) ? s.sel : -1;
+  return back;
+}
+function invertLayerStruct(s) {
+  const f = s.f;
+  const back = {
+    kind: 'lstruct', f, active: f.active, sel, list: f.layers.slice(),
+    props: f.layers.map(l => ({ l, name: l.name, visible: l.visible, locked: l.locked, opacity: l.opacity }))
+  };
+  f.layers = s.list.slice();
+  if (s.props) for (const q of s.props) {
+    q.l.name = q.name; q.l.visible = q.visible; q.l.locked = q.locked; q.l.opacity = q.opacity;
+  }
+  f.active = Math.max(0, Math.min(s.active, f.layers.length - 1));
+  const idx = frames.indexOf(f);
+  if (idx >= 0) cur = idx;
+  sel = -1;
   return back;
 }
 function invertStruct(s) {
@@ -594,7 +684,7 @@ function invertStruct(s) {
   frames.length = 0;
   for (const f of s.list) frames.push(f);
   cur = Math.max(0, Math.min(s.cur, frames.length - 1));
-  sel = (s.sel != null && frames[cur] && s.sel < frames[cur].objs.length) ? s.sel : -1;
+  sel = -1;
   renderTimeline();
   return back;
 }
@@ -602,7 +692,9 @@ function applySnapshot(stack, other) {
   const s = stack.pop();
   if (!s) return;
   stopPlay();
-  other.push(s.kind === 'struct' ? invertStruct(s) : invertFrame(s));
+  other.push(s.kind === 'struct' ? invertStruct(s)
+           : s.kind === 'lstruct' ? invertLayerStruct(s)
+           : invertLayer(s));
   lastEdit = { key: null, t: 0 };
   refreshAll();
   updateHistoryButtons();
@@ -670,6 +762,7 @@ function refreshAll() {
     drawThumb(i);
   });
   $('delay').value = F().delay;
+  renderLayers();
   syncSelPanel();
 }
 
@@ -691,8 +784,9 @@ function duplicateFrame() {
   stopPlay();
   pushStruct();
   const f = newFrame(F().delay);
-  f.cv.getContext('2d').drawImage(F().cv, 0, 0);
-  f.objs = cloneObjs(F().objs);
+  // keep object ids so the copy can be tweened against its source
+  f.layers = F().layers.map(l => cloneLayer(l, true));
+  f.active = F().active;
   frames.splice(cur + 1, 0, f);
   cur++; sel = -1; dirty = true;
   renderTimeline(); refreshAll();
@@ -716,14 +810,174 @@ function moveFrame(i, d) {
   renderTimeline(); refreshAll();
 }
 function flatten() {
-  if (!F().objs.length) { flash('Nothing to flatten on this frame.'); return; }
+  if (!L().objs.length) { toast('This layer has no shapes or text to flatten.', 'bad'); return; }
   pushHistory();
   const c = fctx();
-  F().objs.forEach(o => drawObject(c, o));
-  F().objs = [];
+  L().objs.forEach(o => drawObject(c, o));
+  L().objs = [];
   sel = -1;
   commit();
-  flash('Shapes and text baked into pixels.');
+  toast('Shapes and text baked into pixels.');
+}
+
+/* ---------------------------------------------------------------- layers */
+function renderLayers() {
+  const host = $('layer-list');
+  host.innerHTML = '';
+  const f = F();
+  for (let i = f.layers.length - 1; i >= 0; i--) {      // topmost first, as in any editor
+    const l = f.layers[i], idx = i;
+    const row = document.createElement('div');
+    row.className = 'layer-row' + (i === f.active ? ' on' : '');
+    row.onclick = () => { if (F().active !== idx) { F().active = idx; sel = -1; refreshAll(); } };
+    const eye = document.createElement('button');
+    eye.className = 'mini' + (l.visible ? '' : ' off');
+    eye.innerHTML = l.visible ? '&#128065;' : '&#128683;';
+    eye.title = l.visible ? 'Hide layer' : 'Show layer';
+    eye.onclick = e => { e.stopPropagation(); pushLayerStruct(); l.visible = !l.visible; dirty = true; refreshAll(); };
+    const lock = document.createElement('button');
+    lock.className = 'mini' + (l.locked ? '' : ' off');
+    lock.innerHTML = l.locked ? '&#128274;' : '&#128275;';
+    lock.title = l.locked ? 'Unlock layer' : 'Lock layer';
+    lock.onclick = e => { e.stopPropagation(); pushLayerStruct(); l.locked = !l.locked; refreshAll(); };
+    const nm = document.createElement('span');
+    nm.className = 'nm' + (l.visible ? '' : ' off');
+    nm.textContent = l.name;
+    row.append(eye, lock, nm);
+    host.appendChild(row);
+  }
+  const l = L();
+  $('lay-name').value = l.name;
+  $('lay-op').value = Math.round(l.opacity * 100);
+  $('lay-op-val').textContent = Math.round(l.opacity * 100) + '%';
+  $('lay-del').disabled = f.layers.length <= 1;
+  $('lay-merge').disabled = f.active === 0;
+  $('lay-up').disabled = f.active >= f.layers.length - 1;
+  $('lay-down').disabled = f.active <= 0;
+}
+function addLayer() {
+  stopPlay(); pushLayerStruct();
+  const f = F();
+  f.layers.splice(f.active + 1, 0, newLayer());
+  f.active++; sel = -1; dirty = true;
+  refreshAll();
+  toast('Added ' + L().name + '.');
+}
+function duplicateLayer() {
+  stopPlay(); pushLayerStruct();
+  const f = F();
+  const copy = cloneLayer(L(), false);
+  copy.name = L().name + ' copy';
+  f.layers.splice(f.active + 1, 0, copy);
+  f.active++; sel = -1; dirty = true;
+  refreshAll();
+}
+function deleteLayer() {
+  const f = F();
+  if (f.layers.length <= 1) { toast('A frame needs at least one layer.', 'bad'); return; }
+  stopPlay(); pushLayerStruct();
+  f.layers.splice(f.active, 1);
+  f.active = Math.max(0, f.active - 1);
+  sel = -1; dirty = true;
+  refreshAll();
+}
+function moveLayer(d) {
+  const f = F(), j = f.active + d;
+  if (j < 0 || j >= f.layers.length) return;
+  stopPlay(); pushLayerStruct();
+  [f.layers[f.active], f.layers[j]] = [f.layers[j], f.layers[f.active]];
+  f.active = j; sel = -1; dirty = true;
+  refreshAll();
+}
+function mergeDown() {
+  const f = F();
+  if (f.active === 0) { toast('This is the bottom layer — nothing to merge into.', 'bad'); return; }
+  stopPlay(); pushLayerStruct();
+  const top = f.layers[f.active], bot = f.layers[f.active - 1];
+  const c = bot.cv.getContext('2d');
+  // bake the lower layer's own objects first, or the merged pixels would
+  // land underneath them and the stacking order would silently invert
+  bot.objs.forEach(o => drawObject(c, o));
+  bot.objs = [];
+  c.save();
+  c.globalAlpha = top.opacity;
+  c.drawImage(top.cv, 0, 0);
+  top.objs.forEach(o => drawObject(c, o));
+  c.restore();
+  f.layers.splice(f.active, 1);
+  f.active--;
+  sel = -1; dirty = true;
+  refreshAll();
+  toast('Merged into ' + L().name + '.');
+}
+
+/* ----------------------------------------------------------------- tween */
+const lerp = (a, b, t) => a + (b - a) * t;
+function lerpAngle(a, b, t) {
+  let d = (b || 0) - (a || 0);
+  while (d > Math.PI) d -= Math.PI * 2;    // always take the short way round
+  while (d < -Math.PI) d += Math.PI * 2;
+  return (a || 0) + d * t;
+}
+function lerpColor(a, b, t) {
+  if (!a || !b || a === b) return a;
+  const A = hexToRGB(a), B = hexToRGB(b);
+  return '#' + [0, 1, 2].map(i => Math.round(lerp(A[i], B[i], t)).toString(16).padStart(2, '0')).join('');
+}
+function tweenObject(o, q, t) {
+  return Object.assign({}, o, {
+    x: lerp(o.x, q.x, t), y: lerp(o.y, q.y, t),
+    w: lerp(o.w, q.w, t), h: lerp(o.h, q.h, t),
+    rot: lerpAngle(o.rot, q.rot, t),
+    alpha: lerp(o.alpha, q.alpha, t),
+    lw: lerp(o.lw, q.lw, t),
+    size: (o.size != null && q.size != null) ? lerp(o.size, q.size, t) : o.size,
+    color: lerpColor(o.color, q.color, t)
+  });
+}
+function countTweenable(A, B) {
+  let n = 0;
+  A.layers.forEach((al, li) => {
+    const bl = B.layers[li];
+    if (!bl) return;
+    const map = new Map(bl.objs.filter(o => o.id != null).map(o => [o.id, o]));
+    for (const o of al.objs) if (o.id != null && map.has(o.id)) n++;
+  });
+  return n;
+}
+function tween(steps) {
+  stopPlay();
+  const A = F(), B = frames[cur + 1];
+  if (!B) { toast('Add a frame after this one to tween into.', 'bad'); return; }
+  const matches = countTweenable(A, B);
+  if (!matches) {
+    toast('Nothing to tween — the next frame shares no shapes with this one. Duplicate the frame, move things, then tween.', 'bad');
+    return;
+  }
+  pushStruct();
+  const made = [];
+  for (let i = 1; i <= steps; i++) {
+    const t = i / (steps + 1);
+    const f = { layers: [], active: A.active, delay: A.delay };
+    A.layers.forEach((al, li) => {
+      const nl = cloneLayer(al, true);       // pixels are carried, not interpolated
+      const bl = B.layers[li];
+      if (bl) {
+        const map = new Map(bl.objs.filter(o => o.id != null).map(o => [o.id, o]));
+        nl.objs = al.objs.map(o => {
+          const q = o.id != null ? map.get(o.id) : null;
+          return q ? tweenObject(o, q, t) : Object.assign({}, o);
+        });
+      }
+      f.layers.push(nl);
+    });
+    made.push(f);
+  }
+  frames.splice(cur + 1, 0, ...made);
+  sel = -1; dirty = true;
+  renderTimeline(); refreshAll();
+  toast('Inserted ' + steps + ' tweened frame' + (steps === 1 ? '' : 's') +
+        ', interpolating ' + matches + ' object' + (matches === 1 ? '' : 's') + '.', 'good');
 }
 
 /* ------------------------------------------------------------- playback */
@@ -841,6 +1095,7 @@ function paintStyle(c) {
 }
 function newObjBase(p) {
   return {
+    id: nextObjId(),
     x: p.x, y: p.y, rot: 0, alpha: +$('alpha').value / 100,
     color: $('color').value, mode: styleMode, lw: +$('size').value
   };
@@ -872,6 +1127,9 @@ view.addEventListener('pointerdown', e => {
 
   if (tool === 'eyedrop') { pickColor(p); return; }
 
+  if (L().locked) { toast(L().name + ' is locked.', 'bad'); return; }
+  if (!L().visible) { toast(L().name + ' is hidden — show it before drawing.', 'bad'); return; }
+
   /* ---- select tool ---- */
   if (tool === 'select') {
     const o = selObj();
@@ -895,7 +1153,7 @@ view.addEventListener('pointerdown', e => {
     if (hit >= 0) {
       armHistory();
       mode = 'move';
-      grab = { x: F().objs[hit].x, y: F().objs[hit].y, px: p.x, py: p.y };
+      grab = { x: L().objs[hit].x, y: L().objs[hit].y, px: p.x, py: p.y };
       drawing = true;
     } else { mode = null; }
     syncSelPanel();
@@ -914,8 +1172,8 @@ view.addEventListener('pointerdown', e => {
           size: +$('font-size').value || 48, bold, italic
         });
     if (o.type === 'text') measureObj(o);
-    F().objs.push(o);
-    sel = F().objs.length - 1;
+    L().objs.push(o);
+    sel = L().objs.length - 1;
     mode = 'create';
     grab = { w: o.w, h: o.h, size: o.size };
     drawing = true;
@@ -1534,8 +1792,10 @@ function decodeGIF(buffer) {
 
 /* True when nothing has been drawn yet, so adopting the GIF's own size is safe. */
 function projectIsEmpty() {
-  if (frames.length !== 1 || frames[0].objs.length) return false;
-  const d = frames[0].cv.getContext('2d').getImageData(0, 0, W, H).data;
+  if (frames.length !== 1 || frames[0].layers.length !== 1) return false;
+  const l = frames[0].layers[0];
+  if (l.objs.length) return false;
+  const d = l.cv.getContext('2d').getImageData(0, 0, W, H).data;
   for (let i = 3; i < d.length; i += 4) if (d[i]) return false;
   return true;
 }
@@ -1582,7 +1842,7 @@ async function importGIF(file) {
     sx.drawImage(patch, fr.ix, fr.iy);
 
     const f = newFrame(Math.max(20, fr.gce.delay * 10));
-    const fc = f.cv.getContext('2d');
+    const fc = f.layers[0].cv.getContext('2d');
     if (gif.width === W && gif.height === H) fc.drawImage(stage, 0, 0);
     else {
       const sc = Math.min(W / gif.width, H / gif.height);
@@ -1619,7 +1879,7 @@ function importImages(files) {
     const img = new Image();
     img.onload = () => {
       const f = newFrame();
-      const c = f.cv.getContext('2d');
+      const c = f.layers[0].cv.getContext('2d');
       const s = Math.min(W / img.width, H / img.height);
       c.drawImage(img, (W - img.width * s) / 2, (H - img.height * s) / 2, img.width * s, img.height * s);
       frames.push(f);
@@ -1639,8 +1899,14 @@ function importImages(files) {
 }
 function saveProject() {
   const data = {
-    v: 2, w: W, h: H,
-    frames: frames.map(f => ({ delay: f.delay, objs: f.objs, png: f.cv.toDataURL('image/png') }))
+    v: 3, w: W, h: H,
+    frames: frames.map(f => ({
+      delay: f.delay, active: f.active,
+      layers: f.layers.map(l => ({
+        name: l.name, visible: l.visible, locked: l.locked, opacity: l.opacity,
+        objs: l.objs, png: l.cv.toDataURL('image/png')
+      }))
+    }))
   };
   download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'frame-studio-project.json');
   dirty = false;
@@ -1656,21 +1922,36 @@ function loadProject(file) {
     undoStack.length = redoStack.length = 0;
     updateHistoryButtons();
     frames.length = 0;
-    let pending = data.frames.length;
-    data.frames.forEach((fd, i) => {
+    // v1/v2 projects have a single implicit layer; v3 stores the stack
+    const shaped = data.frames.map(fd => Array.isArray(fd.layers)
+      ? fd
+      : { delay: fd.delay, active: 0, layers: [{ name: 'Layer 1', visible: true, locked: false, opacity: 1, objs: fd.objs, png: fd.png }] });
+    let pending = shaped.reduce((n, fd) => n + fd.layers.length, 0);
+    shaped.forEach((fd, i) => {
       const f = newFrame(fd.delay);
-      f.objs = Array.isArray(fd.objs) ? fd.objs : [];
+      f.active = fd.active || 0;
+      f.layers = fd.layers.map(ld => {
+        const l = newLayer(ld.name);
+        l.visible = ld.visible !== false;
+        l.locked = !!ld.locked;
+        l.opacity = typeof ld.opacity === 'number' ? ld.opacity : 1;
+        l.objs = (Array.isArray(ld.objs) ? ld.objs : []).map(o => Object.assign({ id: nextObjId() }, o));
+        return l;
+      });
       frames[i] = f;
+      fd.layers.forEach((ld, li) => {
       const img = new Image();
       img.onload = () => {
-        f.cv.getContext('2d').drawImage(img, 0, 0);
+        f.layers[li].cv.getContext('2d').drawImage(img, 0, 0);
         if (--pending === 0) {
           cur = 0; sel = -1; renderTimeline(); refreshAll();
           if (zoomIsFit) zoomFit();
           toast('Project loaded — ' + frames.length + ' frames.', 'good');
         }
       };
-      img.src = fd.png;
+      img.onerror = () => { if (--pending === 0) { cur = 0; sel = -1; renderTimeline(); refreshAll(); } };
+      img.src = ld.png;
+      });
     });
   };
   fr.readAsText(file);
@@ -1681,16 +1962,16 @@ function resize(nw, nh, rescale = true) {
   if (nw === W && nh === H) return;
   const sx = nw / W, sy = nh / H, s = Math.min(sx, sy);
   const ox = (nw - W * s) / 2, oy = (nh - H * s) / 2;
-  frames.forEach(f => {
+  frames.forEach(f => f.layers.forEach(l => {
     const c = makeCanvas(nw, nh, true);
-    if (rescale) c.getContext('2d').drawImage(f.cv, ox, oy, W * s, H * s);
-    f.cv = c;
-    if (rescale) f.objs.forEach(o => {
+    if (rescale) c.getContext('2d').drawImage(l.cv, ox, oy, W * s, H * s);
+    l.cv = c;
+    if (rescale) l.objs.forEach(o => {
       o.x = o.x * s + ox; o.y = o.y * s + oy;
       o.w *= s; o.h *= s; o.lw *= s;
       if (o.type === 'text') { o.size *= s; }
     });
-  });
+  }));
   W = view.width = nw; H = view.height = nh;
   if (ref && ref.img) refFit();
   undoStack.length = redoStack.length = 0;
@@ -1756,8 +2037,8 @@ $('font-search').oninput = e => renderFonts(e.target.value.toLowerCase());
 
 $('sel-undo').onclick = undo;
 $('sel-redo').onclick = redo;
-$('sel-front').onclick = () => { const o = selObj(); if (!o) return; pushHistory(); F().objs.splice(sel, 1); F().objs.push(o); sel = F().objs.length - 1; commit(); };
-$('sel-back').onclick = () => { const o = selObj(); if (!o) return; pushHistory(); F().objs.splice(sel, 1); F().objs.unshift(o); sel = 0; commit(); };
+$('sel-front').onclick = () => { const o = selObj(); if (!o) return; pushHistory(); L().objs.splice(sel, 1); L().objs.push(o); sel = L().objs.length - 1; commit(); };
+$('sel-back').onclick = () => { const o = selObj(); if (!o) return; pushHistory(); L().objs.splice(sel, 1); L().objs.unshift(o); sel = 0; commit(); };
 $('sel-dup').onclick = duplicateSelection;
 $('sel-reset').onclick = () => editSel(o => o.rot = 0);
 $('sel-del').onclick = deleteSelection;
@@ -1766,16 +2047,16 @@ function duplicateSelection() {
   const o = selObj();
   if (!o) return;
   pushHistory();
-  const c = Object.assign({}, o, { x: o.x + 16, y: o.y + 16 });
-  F().objs.push(c);
-  sel = F().objs.length - 1;
+  const c = Object.assign({}, o, { id: nextObjId(), x: o.x + 16, y: o.y + 16 });
+  L().objs.push(c);
+  sel = L().objs.length - 1;
   setTool('select');
   commit(); syncSelPanel();
 }
 function deleteSelection() {
   if (sel < 0) return;
   pushHistory();
-  F().objs.splice(sel, 1);
+  L().objs.splice(sel, 1);
   sel = -1;
   commit(); syncSelPanel();
 }
@@ -1893,12 +2174,28 @@ window.addEventListener('resize', () => {
 });
 $('show-checker').onchange = e => $('shell').classList.toggle('flat', !e.target.checked);
 
+$('lay-add').onclick = addLayer;
+$('lay-dup').onclick = duplicateLayer;
+$('lay-del').onclick = deleteLayer;
+$('lay-up').onclick = () => moveLayer(1);
+$('lay-down').onclick = () => moveLayer(-1);
+$('lay-merge').onclick = mergeDown;
+$('lay-name').oninput = e => { pushLayerStruct('name'); L().name = e.target.value || 'Layer'; dirty = true; renderLayers(); };
+$('lay-op').oninput = e => {
+  pushLayerStruct('opacity');
+  L().opacity = +e.target.value / 100;
+  $('lay-op-val').textContent = e.target.value + '%';
+  dirty = true;
+  repaint(); drawThumb(cur);
+};
+$('btn-tween').onclick = () => tween(Math.max(1, Math.min(60, +$('tween-n').value || 4)));
+
 $('btn-add').onclick = addFrame;
 $('btn-dup').onclick = duplicateFrame;
 $('btn-play').onclick = togglePlay;
 $('btn-onion').onclick = e => { onion = !onion; e.currentTarget.classList.toggle('on', onion); repaint(); };
 $('btn-flatten').onclick = flatten;
-$('btn-clear').onclick = () => { pushHistory(); fctx().clearRect(0, 0, W, H); F().objs = []; sel = -1; commit(); syncSelPanel(); };
+$('btn-clear').onclick = () => { pushHistory(); fctx().clearRect(0, 0, W, H); L().objs = []; sel = -1; commit(); syncSelPanel(); };
 $('btn-undo').onclick = undo;
 $('btn-redo').onclick = redo;
 $('btn-export').onclick = async () => {
