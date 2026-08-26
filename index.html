@@ -120,6 +120,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #restore-bar{display:none;align-items:center;gap:10px;margin:0 12px;padding:9px 12px;font-size:13px;
   background:#1e2a1f;border:1px solid #2f5133;border-left:3px solid var(--good);border-radius:8px}
 #restore-bar .grow{flex:1}
+#crop-bar{display:none;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:8px;
+  background:#26201a;border:1px solid #4a3b2c;font-size:13px}
+#crop-bar .grow{flex:1;color:var(--muted)}
 #restore-bar button{padding:6px 10px}
 .saving{color:var(--muted);font-size:11.5px;margin-left:auto;white-space:nowrap}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -184,6 +187,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       </div>
       <h3>Edit</h3>
       <div class="grid2">
+        <button data-tool="crop" title="Crop the canvas to a region — C">✂ Crop</button>
         <button data-tool="select" title="Select, move, resize and rotate — V">🖱️ Select</button>
         <button id="btn-flatten" title="Bake shapes and text into pixels">🔒 Flatten</button>
       </div>
@@ -295,6 +299,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <span class="dims" id="canvas-dims">500 × 500 px</span>
     </div>
 
+    <div id="crop-bar">
+      <span class="grow" id="crop-info">Drag a rectangle on the canvas.</span>
+      <button id="crop-trim" title="Shrink to the artwork's bounding box">⌴ Trim to content</button>
+      <button id="crop-apply" class="green">Apply crop</button>
+      <button id="crop-cancel">Cancel</button>
+    </div>
     <div class="hint" id="hint">Brush selected — draw on the canvas.</div>
     <div class="bar" id="bar"><i></i></div>
   </div>
@@ -374,7 +384,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
       <h3>Shortcuts</h3>
       <div class="keys">
         <kbd>V</kbd> select · <kbd>B</kbd> brush · <kbd>E</kbd> eraser · <kbd>T</kbd> text<br>
-        <kbd>L</kbd> line · <kbd>R</kbd> rect · <kbd>O</kbd> ellipse · <kbd>G</kbd> fill · <kbd>H</kbd> pan<br>
+        <kbd>L</kbd> line · <kbd>R</kbd> rect · <kbd>O</kbd> ellipse · <kbd>G</kbd> fill<br>
+        <kbd>H</kbd> pan · <kbd>C</kbd> crop · <kbd>Enter</kbd> apply crop<br>
         <kbd>+</kbd> <kbd>−</kbd> zoom · <kbd>0</kbd> fit · <kbd>1</kbd> actual size · <kbd>Ctrl</kbd>+wheel<br>
         <kbd>Space</kbd> play/stop · <kbd>N</kbd> new frame · <kbd>D</kbd> duplicate<br>
         <kbd>←</kbd><kbd>→</kbd> move selection / change frame<br>
@@ -411,6 +422,7 @@ let dirty = false, syncing = false;
 let ref = null;   // tracing underlay: {img, alpha, zoom, fit, x, y, visible, move, locked}
 let zoom = 1;
 let onionDepth = 1;
+let cropRect = null;      // {x, y, w, h} while a crop is being set up
 
 /* Canvas units per CSS pixel. Handle sizes and grab tolerances are drawn and
    tested in canvas units, but they need to stay a constant size on screen -
@@ -586,7 +598,32 @@ function repaint(ghost) {
   renderFrame(vctx, F());
   vctx.globalAlpha = 1;
   if (ghost) ghost(vctx);
+  if (cropRect) drawCropOverlay();
   if (sel >= 0 && !playing) drawSelection();
+}
+function drawCropOverlay() {
+  const r = cropRect, u = perPx();
+  vctx.save();
+  vctx.globalAlpha = 1;
+  vctx.fillStyle = 'rgba(0,0,0,.55)';          // dim everything being discarded
+  vctx.beginPath();
+  vctx.rect(0, 0, W, H);
+  vctx.rect(r.x, r.y, r.w, r.h);
+  vctx.fill('evenodd');
+  vctx.strokeStyle = '#fff';
+  vctx.lineWidth = 1.5 * u;
+  vctx.setLineDash([6 * u, 4 * u]);
+  vctx.strokeRect(r.x, r.y, r.w, r.h);
+  vctx.setLineDash([]);
+  vctx.strokeStyle = 'rgba(255,255,255,.55)';
+  vctx.lineWidth = 1 * u;
+  for (let i = 1; i < 3; i++) {                 // thirds, to help line the crop up
+    vctx.beginPath();
+    vctx.moveTo(r.x + r.w * i / 3, r.y); vctx.lineTo(r.x + r.w * i / 3, r.y + r.h);
+    vctx.moveTo(r.x, r.y + r.h * i / 3); vctx.lineTo(r.x + r.w, r.y + r.h * i / 3);
+    vctx.stroke();
+  }
+  vctx.restore();
 }
 function drawSelection() {
   const o = selObj();
@@ -940,6 +977,64 @@ function mergeDown() {
   toast('Merged into ' + L().name + '.');
 }
 
+/* ------------------------------------------------------------------ crop */
+function setCropRect(r) {
+  cropRect = r;
+  const bar = $('crop-bar');
+  if (!r) { bar.style.display = 'none'; repaint(); return; }
+  bar.style.display = 'flex';
+  $('crop-info').textContent = 'Crop to ' + Math.round(r.w) + ' \u00d7 ' + Math.round(r.h) +
+    ' px, from ' + Math.round(r.x) + ',' + Math.round(r.y) + '.';
+  repaint();
+}
+/* Bounding box of everything drawn, across every frame and visible layer. */
+function contentBounds() {
+  const t = makeCanvas(W, H, true), c = t.getContext('2d');
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (const f of frames) {
+    c.clearRect(0, 0, W, H);
+    renderFrame(c, f);
+    const d = c.getImageData(0, 0, W, H).data;
+    for (let y = 0, k = 3; y < H; y++) {
+      for (let x = 0; x < W; x++, k += 4) {
+        if (d[k] < 8) continue;
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) return null;
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+function applyCrop() {
+  if (!cropRect) return;
+  const x = Math.max(0, Math.round(cropRect.x)), y = Math.max(0, Math.round(cropRect.y));
+  const w = Math.max(1, Math.min(W - x, Math.round(cropRect.w)));
+  const h = Math.max(1, Math.min(H - y, Math.round(cropRect.h)));
+  if (w === W && h === H && x === 0 && y === 0) { setCropRect(null); return; }
+  stopPlay();
+  frames.forEach(f => f.layers.forEach(l => {
+    const c = makeCanvas(w, h, true);
+    c.getContext('2d').drawImage(l.cv, -x, -y);   // translate rather than scale
+    l.cv = c;
+    l.objs.forEach(o => { o.x -= x; o.y -= y; });
+  }));
+  W = view.width = w; H = view.height = h;
+  // old snapshots are the wrong size for putImageData, so the history cannot survive
+  undoStack.length = redoStack.length = 0;
+  updateHistoryButtons();
+  if (ref && ref.img) refFit();
+  sel = -1;
+  setCropRect(null);
+  dirty = true;
+  renderTimeline(); refreshAll();
+  applyZoom();
+  if (zoomIsFit) zoomFit();
+  toast('Cropped to ' + w + ' \u00d7 ' + h + '. Undo history was cleared.', 'good');
+}
+
 /* ----------------------------------------------------------------- tween */
 const lerp = (a, b, t) => a + (b - a) * t;
 const EASE = {
@@ -1052,6 +1147,7 @@ function setTool(t, sh) {
   const btn = document.querySelector(sh ? '#stamps [data-shape="' + sh + '"]' : '#tools [data-tool="' + t + '"]');
   if (btn) btn.classList.add('on');
   if (t !== 'select') sel = -1;
+  if (t !== 'crop') setCropRect(null);
   if (ref && ref.move) { ref.move = false; $('ref-move').classList.remove('on'); }
   $('text-panel').style.display = (t === 'text' || (t === 'select' && selObj() && selObj().type === 'text')) ? '' : 'none';
   const msgs = {
@@ -1061,10 +1157,12 @@ function setTool(t, sh) {
     ellipse: 'Ellipse — drag. Hold Shift for a circle.', fill: 'Fill — click an area to flood fill the pixel layer.',
     text: 'Text — click the canvas to place your text.', eyedrop: 'Picker — click to sample a colour.',
     pan: 'Pan - drag to move around the canvas. Ctrl+wheel zooms.',
+    crop: 'Crop \u2014 drag out the area to keep, or use Trim to content.',
     stamp: 'Stamp (' + sh + ') — click, or drag to set the size.'
   };
   $('hint').textContent = msgs[sh ? 'stamp' : t] || '';
-  view.style.cursor = t === 'pan' ? 'grab'
+  view.style.cursor = t === 'crop' ? 'crosshair'
+    : t === 'pan' ? 'grab'
     : t === 'select' ? 'default'
     : (t === 'fill' || t === 'eyedrop' ? 'cell' : 'crosshair');
   repaint();
@@ -1164,6 +1262,14 @@ view.addEventListener('pointerdown', e => {
 
   if (tool === 'eyedrop') { pickColor(p); return; }
 
+  if (tool === 'crop') {
+    drawing = true;
+    mode = 'crop';
+    grab = { x: p.x, y: p.y };
+    setCropRect({ x: p.x, y: p.y, w: 0, h: 0 });
+    return;
+  }
+
   if (L().locked) { toast(L().name + ' is locked.', 'bad'); return; }
   if (!L().visible) { toast(L().name + ' is hidden — show it before drawing.', 'bad'); return; }
 
@@ -1249,7 +1355,17 @@ view.addEventListener('pointermove', e => {
   moved = true;
   const o = selObj();
 
-  if (mode === 'pan') {
+  if (mode === 'crop') {
+    let x = Math.max(0, Math.min(W, p.x)), y = Math.max(0, Math.min(H, p.y));
+    if (shiftKey) {                       // square crop
+      const d = Math.max(Math.abs(x - grab.x), Math.abs(y - grab.y));
+      x = grab.x + Math.sign(x - grab.x || 1) * d;
+      y = grab.y + Math.sign(y - grab.y || 1) * d;
+      x = Math.max(0, Math.min(W, x)); y = Math.max(0, Math.min(H, y));
+    }
+    setCropRect({ x: Math.min(grab.x, x), y: Math.min(grab.y, y),
+                  w: Math.abs(x - grab.x), h: Math.abs(y - grab.y) });
+  } else if (mode === 'pan') {
     const vp = $('viewport');
     vp.scrollLeft = grab.sx - (e.clientX - grab.cx);
     vp.scrollTop = grab.sy - (e.clientY - grab.cy);
@@ -1306,6 +1422,11 @@ window.addEventListener('pointerup', () => {
   if (!drawing) return;
   drawing = false;
   pendingHist = false;                      // a click that only selected: nothing to record
+  if (mode === 'crop') {
+    mode = null; grab = null;
+    if (!cropRect || cropRect.w < 4 || cropRect.h < 4) setCropRect(null);
+    return;
+  }
   if (mode === 'pan') { mode = null; grab = null; view.style.cursor = tool === 'pan' ? 'grab' : ''; setTool(tool, shape); return; }
   if (mode === 'ref') { mode = null; grab = null; repaint(); return; }
   const wasCreate = mode === 'create';
@@ -2408,6 +2529,15 @@ $('lay-op').oninput = e => {
   dirty = true;
   repaint(); drawThumb(cur);
 };
+$('crop-apply').onclick = applyCrop;
+$('crop-cancel').onclick = () => setCropRect(null);
+$('crop-trim').onclick = () => {
+  const b = contentBounds();
+  if (!b) { toast('Nothing drawn yet \u2014 there is nothing to trim to.', 'bad'); return; }
+  setTool('crop');
+  setCropRect(b);
+  toast('Trimmed to the artwork. Press Apply to confirm.');
+};
 $('btn-tween').onclick = () => tween(Math.max(1, Math.min(60, +$('tween-n').value || 4)));
 
 $('btn-add').onclick = addFrame;
@@ -2461,12 +2591,13 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k === 'c') { e.preventDefault(); copySelection(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'v') { e.preventDefault(); pasteSelection(); return; }
   if (e.ctrlKey || e.metaKey) return;
-  if (e.key === 'Escape') { sel = -1; syncSelPanel(); repaint(); return; }
+  if (e.key === 'Escape') { if (cropRect) { setCropRect(null); return; } sel = -1; syncSelPanel(); repaint(); return; }
   if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIsFit = false; setZoom(zoom * 1.25); return; }
   if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomIsFit = false; setZoom(zoom / 1.25); return; }
   if (e.key === '0') { e.preventDefault(); zoomIsFit = true; zoomFit(); return; }
   if (e.key === '1') { e.preventDefault(); zoomIsFit = false; setZoom(1); return; }
-  const map = { v: 'select', b: 'brush', e: 'eraser', t: 'text', l: 'line', r: 'rect', o: 'ellipse', g: 'fill', i: 'eyedrop', h: 'pan' };
+  if (e.key === 'Enter' && cropRect) { e.preventDefault(); applyCrop(); return; }
+  const map = { v: 'select', b: 'brush', e: 'eraser', t: 'text', l: 'line', r: 'rect', o: 'ellipse', g: 'fill', i: 'eyedrop', h: 'pan', c: 'crop' };
   if (map[k]) { setTool(map[k]); return; }
   if (k === 'n') addFrame();
   else if (k === 'd') duplicateFrame();
