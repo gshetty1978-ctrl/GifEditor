@@ -137,7 +137,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <div class="spacer"></div>
   <button id="btn-undo" title="Undo (Ctrl+Z)">↶ Undo</button>
   <button id="btn-redo" title="Redo (Ctrl+Y)">↷ Redo</button>
-  <button id="btn-import">📥 Import images</button>
+  <button id="btn-import" title="Import a GIF as frames, or images as frames">📥 Import GIF / images</button>
   <button id="btn-save-proj">🗂️ Save project</button>
   <button id="btn-load-proj">📂 Open project</button>
   <button id="btn-export" class="violet">💾 Export GIF</button>
@@ -332,7 +332,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   <div class="timeline" id="timeline"></div>
 </div>
 
-<input type="file" id="file-img" accept="image/*" multiple hidden>
+<input type="file" id="file-img" accept="image/*,.gif" multiple hidden>
 <input type="file" id="file-proj" accept="application/json,.json" hidden>
 <input type="file" id="file-ref" accept="image/*" hidden>
 <div id="toasts" aria-live="polite"></div>
@@ -561,21 +561,48 @@ function zoomFit() {
 }
 
 /* ---------------------------------------------------------------- history */
-function pushHistory() {
-  undoStack.push({ i: cur, sel, data: fctx().getImageData(0, 0, W, H), objs: cloneObjs(F().objs) });
+function record(entry) {
+  undoStack.push(entry);
   if (undoStack.length > HISTORY_MAX) undoStack.shift();
   redoStack.length = 0;
   updateHistoryButtons();
 }
-function applySnapshot(stack, other) {
-  const s = stack.pop();
-  if (!s || !frames[s.i]) return;
-  const f = frames[s.i], c = f.cv.getContext('2d');
-  other.push({ i: s.i, sel, data: c.getImageData(0, 0, W, H), objs: cloneObjs(f.objs) });
+/* Content of one frame: pixels plus its object layer. The frame is held by
+   reference, not by index, so a later add/delete/reorder cannot silently
+   redirect this entry at a different frame. */
+function pushHistory() {
+  record({ kind: 'frame', f: F(), sel, data: fctx().getImageData(0, 0, W, H), objs: cloneObjs(F().objs) });
+}
+/* Shape of the frame list itself. frames.slice() copies references only, so
+   this is cheap and a deleted frame stays alive in the snapshot, pixels and
+   all, ready to be put back. */
+function pushStruct() {
+  record({ kind: 'struct', cur, sel, list: frames.slice() });
+}
+function invertFrame(s) {
+  const f = s.f, c = f.cv.getContext('2d');
+  const back = { kind: 'frame', f, sel, data: c.getImageData(0, 0, W, H), objs: cloneObjs(f.objs) };
   c.putImageData(s.data, 0, 0);
   f.objs = s.objs;
-  cur = s.i;
+  const idx = frames.indexOf(f);
+  if (idx >= 0) cur = idx;               // frame may be absent if a delete is still pending
   sel = (s.sel != null && s.sel < f.objs.length) ? s.sel : -1;
+  return back;
+}
+function invertStruct(s) {
+  const back = { kind: 'struct', cur, sel, list: frames.slice() };
+  frames.length = 0;
+  for (const f of s.list) frames.push(f);
+  cur = Math.max(0, Math.min(s.cur, frames.length - 1));
+  sel = (s.sel != null && frames[cur] && s.sel < frames[cur].objs.length) ? s.sel : -1;
+  renderTimeline();
+  return back;
+}
+function applySnapshot(stack, other) {
+  const s = stack.pop();
+  if (!s) return;
+  stopPlay();
+  other.push(s.kind === 'struct' ? invertStruct(s) : invertFrame(s));
   lastEdit = { key: null, t: 0 };
   refreshAll();
   updateHistoryButtons();
@@ -655,12 +682,14 @@ function selectFrame(i) {
 }
 function addFrame() {
   stopPlay();
+  pushStruct();
   frames.splice(cur + 1, 0, newFrame());
   cur++; sel = -1; dirty = true;
   renderTimeline(); refreshAll();
 }
 function duplicateFrame() {
   stopPlay();
+  pushStruct();
   const f = newFrame(F().delay);
   f.cv.getContext('2d').drawImage(F().cv, 0, 0);
   f.objs = cloneObjs(F().objs);
@@ -669,8 +698,9 @@ function duplicateFrame() {
   renderTimeline(); refreshAll();
 }
 function deleteFrame(i) {
-  if (frames.length <= 1) { flash('Keep at least one frame.'); return; }
+  if (frames.length <= 1) { toast('A project needs at least one frame.', 'bad'); return; }
   stopPlay();
+  pushStruct();
   frames.splice(i, 1);
   if (cur >= frames.length) cur = frames.length - 1;
   sel = -1; dirty = true;
@@ -680,6 +710,7 @@ function moveFrame(i, d) {
   const j = i + d;
   if (j < 0 || j >= frames.length) return;
   stopPlay();
+  pushStruct();
   [frames[i], frames[j]] = [frames[j], frames[i]];
   cur = j; sel = -1; dirty = true;
   renderTimeline(); refreshAll();
@@ -1349,9 +1380,242 @@ function flash(msg) {
   flashTimer = setTimeout(() => setTool(tool, shape), 2600);
 }
 
+/* -------------------------------------------------------------- GIF decoder */
+/* The mirror of the encoder above: enough of GIF89a to read back anything the
+   format actually produces - local palettes, interlacing, transparency and all
+   four disposal methods. Frames are composited onto a running canvas because a
+   GIF frame is a patch over its predecessor, not a complete picture. */
+function lzwDecode(minCodeSize, data, pixelCount) {
+  const clear = 1 << minCodeSize, eoi = clear + 1;
+  const out = new Uint8Array(pixelCount);
+  const prefix = new Int32Array(4096);
+  const suffix = new Uint8Array(4096);
+  const stack = new Uint8Array(4097);
+  for (let i = 0; i < clear; i++) suffix[i] = i;
+  let codeSize = minCodeSize + 1;
+  let codeMask = (1 << codeSize) - 1;
+  let available = clear + 2;
+  let old = -1, first = 0;
+  let datum = 0, bits = 0, bi = 0, top = 0, pi = 0;
+  while (pi < pixelCount) {
+    if (top === 0) {
+      if (bits < codeSize) {
+        if (bi >= data.length) break;      // truncated stream: keep what we have
+        datum |= data[bi++] << bits;
+        bits += 8;
+        continue;
+      }
+      let code = datum & codeMask;
+      datum >>= codeSize;
+      bits -= codeSize;
+      if (code === eoi) break;
+      if (code === clear) {
+        codeSize = minCodeSize + 1;
+        codeMask = (1 << codeSize) - 1;
+        available = clear + 2;
+        old = -1;
+        continue;
+      }
+      if (old === -1) {
+        stack[top++] = suffix[code];
+        old = code;
+        first = code;
+        continue;
+      }
+      const inCode = code;
+      if (code >= available) { stack[top++] = first; code = old; }
+      while (code >= clear) { stack[top++] = suffix[code]; code = prefix[code]; }
+      first = suffix[code];
+      stack[top++] = first;
+      if (available < 4096) {
+        prefix[available] = old;
+        suffix[available] = first;
+        available++;
+        if ((available & codeMask) === 0 && available < 4096) {
+          codeSize++;
+          codeMask = (1 << codeSize) - 1;
+        }
+      }
+      old = inCode;
+    }
+    out[pi++] = stack[--top];
+  }
+  return out;
+}
+
+/* Interlaced GIFs store rows in four passes; this maps stored row -> real row. */
+function interlaceMap(h) {
+  const map = new Array(h);
+  let k = 0;
+  for (const [start, step] of [[0, 8], [4, 8], [2, 4], [1, 2]])
+    for (let y = start; y < h; y += step) map[k++] = y;
+  return map;
+}
+
+function decodeGIF(buffer) {
+  const d = new Uint8Array(buffer);
+  let p = 0;
+  const need = n => { if (p + n > d.length) throw new Error('the file ends unexpectedly'); };
+  const u16 = () => { need(2); const v = d[p] | (d[p + 1] << 8); p += 2; return v; };
+  need(6);
+  let sig = '';
+  for (let i = 0; i < 6; i++) sig += String.fromCharCode(d[p++]);
+  if (sig !== 'GIF87a' && sig !== 'GIF89a') throw new Error('this is not a GIF file');
+  const width = u16(), height = u16();
+  need(3);
+  const packed = d[p++];
+  p += 2;                                  // background index, pixel aspect ratio
+  let gct = null;
+  if (packed & 0x80) {
+    const n = 3 << ((packed & 7) + 1);
+    need(n);
+    gct = d.subarray(p, p + n);
+    p += n;
+  }
+  const skipBlocks = () => { while (p < d.length && d[p] !== 0) p += d[p] + 1; p++; };
+  const out = [];
+  let gce = null;
+  while (p < d.length) {
+    const marker = d[p++];
+    if (marker === 0x3B) break;            // trailer
+    if (marker === 0x21) {                 // extension
+      const label = d[p++];
+      if (label === 0xF9) {
+        const size = d[p++];
+        const flags = d[p];
+        const delay = d[p + 1] | (d[p + 2] << 8);
+        const tIndex = d[p + 3];
+        p += size;
+        skipBlocks();
+        gce = { disposal: (flags >> 2) & 7, transparent: (flags & 1) ? tIndex : -1, delay };
+      } else skipBlocks();
+      continue;
+    }
+    if (marker !== 0x2C) continue;         // tolerate padding between blocks
+    const ix = u16(), iy = u16(), iw = u16(), ih = u16();
+    need(1);
+    const ipacked = d[p++];
+    let lct = null;
+    if (ipacked & 0x80) {
+      const n = 3 << ((ipacked & 7) + 1);
+      need(n);
+      lct = d.subarray(p, p + n);
+      p += n;
+    }
+    const palette = lct || gct;
+    if (!palette) throw new Error('a frame has no colour table');
+    need(1);
+    const minCodeSize = d[p++];
+    const chunks = [];
+    let total = 0;
+    while (p < d.length && d[p] !== 0) {
+      const len = d[p++];
+      need(len);
+      chunks.push(d.subarray(p, p + len));
+      total += len;
+      p += len;
+    }
+    p++;
+    const bytes = new Uint8Array(total);
+    let o = 0;
+    for (const c of chunks) { bytes.set(c, o); o += c.length; }
+    out.push({
+      ix, iy, iw, ih,
+      interlaced: !!(ipacked & 0x40),
+      indices: lzwDecode(minCodeSize, bytes, iw * ih),
+      palette,
+      gce: gce || { disposal: 0, transparent: -1, delay: 10 }
+    });
+    gce = null;
+  }
+  if (!out.length) throw new Error('no frames found');
+  return { width, height, frames: out };
+}
+
+/* True when nothing has been drawn yet, so adopting the GIF's own size is safe. */
+function projectIsEmpty() {
+  if (frames.length !== 1 || frames[0].objs.length) return false;
+  const d = frames[0].cv.getContext('2d').getImageData(0, 0, W, H).data;
+  for (let i = 3; i < d.length; i += 4) if (d[i]) return false;
+  return true;
+}
+
+async function importGIF(file) {
+  let gif;
+  try {
+    gif = decodeGIF(await file.arrayBuffer());
+  } catch (err) {
+    console.error(err);
+    toast('Could not read ' + file.name + ' \u2014 ' + err.message + '.', 'bad');
+    return;
+  }
+  const fresh = projectIsEmpty();
+  if (fresh && (gif.width !== W || gif.height !== H)) resize(gif.width, gif.height, false);
+  pushStruct();
+
+  const stage = makeCanvas(gif.width, gif.height, true);
+  const sx = stage.getContext('2d');
+  const patch = makeCanvas(1, 1, true);
+  let restore = null;
+  const made = [];
+
+  for (const fr of gif.frames) {
+    if (fr.gce.disposal === 3) restore = sx.getImageData(0, 0, gif.width, gif.height);
+    patch.width = fr.iw; patch.height = fr.ih;
+    const pc = patch.getContext('2d');
+    const img = pc.createImageData(fr.iw, fr.ih);
+    const dst = img.data, pal = fr.palette, trans = fr.gce.transparent;
+    const rows = fr.interlaced ? interlaceMap(fr.ih) : null;
+    for (let k = 0; k < fr.ih; k++) {
+      const y = rows ? rows[k] : k;
+      for (let x = 0; x < fr.iw; x++) {
+        const idx = fr.indices[k * fr.iw + x];
+        const o = (y * fr.iw + x) * 4;
+        if (idx === trans) { dst[o + 3] = 0; continue; }
+        const q = idx * 3;
+        dst[o] = pal[q]; dst[o + 1] = pal[q + 1]; dst[o + 2] = pal[q + 2]; dst[o + 3] = 255;
+      }
+    }
+    pc.putImageData(img, 0, 0);
+    // drawImage composites, so transparent pixels of the patch leave the
+    // running frame intact - which is the whole point of a GIF patch
+    sx.drawImage(patch, fr.ix, fr.iy);
+
+    const f = newFrame(Math.max(20, fr.gce.delay * 10));
+    const fc = f.cv.getContext('2d');
+    if (gif.width === W && gif.height === H) fc.drawImage(stage, 0, 0);
+    else {
+      const sc = Math.min(W / gif.width, H / gif.height);
+      fc.drawImage(stage, (W - gif.width * sc) / 2, (H - gif.height * sc) / 2, gif.width * sc, gif.height * sc);
+    }
+    made.push(f);
+
+    if (fr.gce.disposal === 2) sx.clearRect(fr.ix, fr.iy, fr.iw, fr.ih);
+    else if (fr.gce.disposal === 3 && restore) sx.putImageData(restore, 0, 0);
+  }
+
+  if (fresh) frames.length = 0;
+  for (const f of made) frames.push(f);
+  cur = frames.length - made.length;
+  sel = -1;
+  dirty = true;
+  renderTimeline();
+  refreshAll();
+  if (zoomIsFit) zoomFit();
+  toast('Imported ' + made.length + ' frame' + (made.length === 1 ? '' : 's') +
+        ' from ' + file.name + ' (' + gif.width + '\u00d7' + gif.height + ').', 'good');
+}
+
 /* ------------------------------------------------------------ import/save */
 function importImages(files) {
-  [...files].forEach(file => {
+  const list = [...files];
+  const gifs = list.filter(f => /gif$/i.test(f.type) || /\.gif$/i.test(f.name));
+  const stills = list.filter(f => !gifs.includes(f));
+  gifs.forEach(importGIF);
+  if (!stills.length) return;
+  let pending = stills.length;
+  pushStruct();
+  stills.forEach(file => {
     const img = new Image();
     img.onload = () => {
       const f = newFrame();
@@ -1363,6 +1627,12 @@ function importImages(files) {
       dirty = true;
       renderTimeline(); refreshAll();
       URL.revokeObjectURL(img.src);
+      if (--pending === 0) toast('Imported ' + stills.length + (stills.length === 1 ? ' image.' : ' images.'), 'good');
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(img.src);
+      toast('Could not read ' + file.name + '.', 'bad');
+      if (--pending === 0) renderTimeline();
     };
     img.src = URL.createObjectURL(file);
   });
@@ -1383,6 +1653,8 @@ function loadProject(file) {
     try { data = JSON.parse(fr.result); } catch { toast('That is not a Frame Studio project file.', 'bad'); return; }
     if (!data.frames || !data.frames.length) { toast('That project has no frames in it.', 'bad'); return; }
     resize(data.w || 500, data.h || 500, false);
+    undoStack.length = redoStack.length = 0;
+    updateHistoryButtons();
     frames.length = 0;
     let pending = data.frames.length;
     data.frames.forEach((fd, i) => {
