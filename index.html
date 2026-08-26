@@ -23,9 +23,9 @@ header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:
 header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.2px}
 header .spacer{flex:1}
 .badge{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:2px 8px;border-radius:99px}
-.wrap{display:grid;grid-template-columns:270px 1fr 230px;gap:12px;padding:12px;align-items:start}
-@media(max-width:1100px){.wrap{grid-template-columns:1fr}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px}
+.wrap{display:grid;grid-template-columns:270px minmax(0,1fr) 230px;gap:12px;padding:12px;align-items:start}
+@media(max-width:1100px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-width:0}
 .panel h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
 .sec+.sec{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);padding:8px 10px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:.12s}
@@ -47,10 +47,13 @@ input[type=text],input[type=number],textarea,select{background:var(--panel2);bor
 textarea{resize:vertical;min-height:56px}
 .stage{display:flex;flex-direction:column;align-items:center;gap:10px}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%}
-.canvas-shell{position:relative;border-radius:var(--radius);overflow:hidden;border:1px solid var(--line);
+.viewport{width:100%;min-width:0;overflow:auto;display:flex;justify-content:safe center;align-items:safe center;max-height:70vh;min-height:280px;
+  border-radius:var(--radius);background:#0b0d12;box-shadow:inset 0 0 0 1px var(--line)}
+.canvas-shell{position:relative;flex:0 0 auto;border-radius:6px;overflow:hidden;
+  outline:1px solid var(--line);outline-offset:0;
   background-image:linear-gradient(45deg,#20242e 25%,transparent 25%),linear-gradient(-45deg,#20242e 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#20242e 75%),linear-gradient(-45deg,transparent 75%,#20242e 75%);
   background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0}
-canvas#view{display:block;max-width:100%;height:auto;touch-action:none;cursor:crosshair}
+canvas#view{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 .hint{color:var(--muted);font-size:12.5px;min-height:18px;text-align:center}
 .timeline{grid-column:1/-1;display:flex;gap:10px;overflow-x:auto;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);min-height:126px;align-items:flex-start}
 .fr{position:relative;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px}
@@ -70,6 +73,60 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
 .bar i{display:block;height:100%;width:0;background:var(--accent);transition:.2s}
 #sel-panel{background:#1b2333;border:1px dashed var(--accent);border-radius:8px;padding:10px}
 .note{color:var(--muted);font-size:11.5px;margin:6px 0 0}
+
+/* focus: keyboard users get a visible ring, mouse users do not */
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px}
+.fonts div:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+
+/* zoom bar under the canvas */
+.zoombar{display:flex;align-items:center;gap:6px;width:100%;flex-wrap:wrap}
+.zoombar button{padding:6px 9px}
+.zoombar .readout{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px;min-width:48px;text-align:center}
+.zoombar .dims{color:var(--muted);font-size:12px;margin-left:auto}
+
+/* tool groups */
+#tools h3{margin-top:14px}
+#tools h3:first-child{margin-top:0}
+
+/* the reference panel states what it will never do */
+.badge-warn{display:inline-block;font-size:10.5px;letter-spacing:.03em;color:#ffd9a3;
+  background:#3a2b16;border:1px solid #5c4423;border-radius:99px;padding:2px 8px;margin-top:8px}
+.locked{opacity:.5;pointer-events:none}
+
+/* toasts */
+#toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:50;
+  pointer-events:none;max-width:min(360px,calc(100vw - 32px))}
+.toast{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:8px;padding:10px 13px;font-size:13px;color:var(--text);
+  box-shadow:0 8px 24px rgba(0,0,0,.45);opacity:0;transform:translateY(6px);
+  transition:opacity .18s ease,transform .18s ease}
+.toast.in{opacity:1;transform:none}
+.toast.good{border-left-color:var(--good)}
+.toast.bad{border-left-color:var(--bad)}
+
+.canvas-shell.flat{background-image:none;background-color:#12151c}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* small screens: keep every control reachable and tappable */
+@media (max-width:760px){
+  header{padding:8px 10px;gap:8px}
+  header h1{font-size:14px}
+  .badge{display:none}
+  .wrap{padding:8px;gap:8px}
+  .panel{padding:10px}
+  .viewport{max-height:52vh;min-height:220px}
+  .timeline{min-height:104px;padding:10px}
+  .fr canvas{width:64px;height:64px}
+  .keys{font-size:11px;line-height:1.8}
+}
+@media (pointer:coarse){
+  button{min-height:42px}
+  .grid4 button{font-size:19px}
+  .fr .ops{opacity:1}
+  .fr .ops button{width:30px;height:30px;min-height:30px;font-size:13px}
+  .zoombar button{min-height:38px}
+}
 </style>
 </head>
 <body>
@@ -90,18 +147,27 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
 
   <!-- LEFT -->
   <div class="panel">
-    <div class="sec">
-      <h3>Tools</h3>
-      <div class="grid2" id="tools">
-        <button data-tool="select" title="Select / move / resize (V)">🖱️ Select</button>
-        <button data-tool="brush" class="on">🖌️ Brush</button>
-        <button data-tool="eraser">🧽 Eraser</button>
-        <button data-tool="line">📏 Line</button>
-        <button data-tool="rect">▭ Rect</button>
-        <button data-tool="ellipse">◯ Ellipse</button>
-        <button data-tool="fill">🪣 Fill</button>
-        <button data-tool="text">🔤 Text</button>
-        <button data-tool="eyedrop">💧 Pick</button>
+    <div class="sec" id="tools">
+      <h3>Draw</h3>
+      <div class="grid2">
+        <button data-tool="brush" class="on" title="Brush — B">🖌️ Brush</button>
+        <button data-tool="eraser" title="Eraser — E">🧽 Eraser</button>
+        <button data-tool="line" title="Line — L">📏 Line</button>
+        <button data-tool="rect" title="Rectangle — R">▭ Rect</button>
+        <button data-tool="ellipse" title="Ellipse — O">◯ Ellipse</button>
+        <button data-tool="fill" title="Flood fill — G">🪣 Fill</button>
+        <button data-tool="text" title="Text — T">🔤 Text</button>
+        <button data-tool="eyedrop" title="Colour picker — I">💧 Pick</button>
+      </div>
+      <h3>Edit</h3>
+      <div class="grid2">
+        <button data-tool="select" title="Select, move, resize and rotate — V">🖱️ Select</button>
+        <button id="btn-flatten" title="Bake shapes and text into pixels">🔒 Flatten</button>
+      </div>
+      <h3>View</h3>
+      <div class="grid2">
+        <button data-tool="pan" title="Pan the canvas — H">✋ Pan</button>
+        <button id="btn-onion" title="Show neighbouring frames as a ghost">🧅 Onion</button>
       </div>
     </div>
 
@@ -178,11 +244,21 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
       <button id="btn-play" class="primary">▶️ Play</button>
       <label class="row" style="margin:0">Delay <input type="number" id="delay" value="120" min="20" step="10" style="width:78px"> ms</label>
       <button id="btn-delay-all" title="Apply this delay to every frame">↔ all</button>
-      <div class="spacer" style="flex:1"></div>
-      <button id="btn-onion">🧅 Onion</button>
     </div>
 
-    <div class="canvas-shell"><canvas id="view" width="500" height="500"></canvas></div>
+    <div class="viewport" id="viewport">
+      <div class="canvas-shell" id="shell"><canvas id="view" width="500" height="500"></canvas></div>
+    </div>
+
+    <div class="zoombar">
+      <button id="zoom-out" title="Zoom out — minus key">−</button>
+      <span class="readout" id="zoom-val">100%</span>
+      <button id="zoom-in" title="Zoom in — plus key">+</button>
+      <button id="zoom-fit" title="Fit canvas to the window — 0">⤢ Fit</button>
+      <button id="zoom-100" title="Actual size — 1">1:1</button>
+      <span class="dims" id="canvas-dims">500 × 500 px</span>
+    </div>
+
     <div class="hint" id="hint">Brush selected — draw on the canvas.</div>
     <div class="bar" id="bar"><i></i></div>
   </div>
@@ -200,6 +276,7 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
         <option value="480x600">480 × 600 (portrait)</option>
       </select>
       <p class="note">Existing frames are rescaled.</p>
+      <label class="row" style="margin-top:8px">Checkerboard <input type="checkbox" id="show-checker" checked></label>
     </div>
     <div class="sec">
       <h3>Reference image</h3>
@@ -214,10 +291,15 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
           <button id="ref-show" class="on">&#128065; Shown</button>
         </div>
         <div class="grid2" style="margin-top:6px">
-          <button id="ref-fit">&#10530; Fit</button>
-          <button id="ref-clear" class="danger">&#10005; Remove</button>
+          <button id="ref-fit" title="Re-centre and fit to the canvas">&#10530; Fit</button>
+          <button id="ref-lock" title="Lock so it cannot be moved by accident">&#128275; Unlocked</button>
         </div>
-        <p class="note">Sits behind your drawing as a tracing guide. Never appears in the exported GIF.</p>
+        <div class="grid2" style="margin-top:6px">
+          <button id="ref-replace" title="Swap in a different image">&#8635; Replace</button>
+          <button id="ref-clear" class="danger" title="Remove the reference">&#10005; Remove</button>
+        </div>
+        <span class="badge-warn">Never exported</span>
+        <p class="note">A tracing guide behind your drawing. Lock it once positioned so it cannot be nudged.</p>
       </div>
     </div>
     <div class="sec">
@@ -236,7 +318,8 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
       <h3>Shortcuts</h3>
       <div class="keys">
         <kbd>V</kbd> select · <kbd>B</kbd> brush · <kbd>E</kbd> eraser · <kbd>T</kbd> text<br>
-        <kbd>L</kbd> line · <kbd>R</kbd> rect · <kbd>O</kbd> ellipse · <kbd>G</kbd> fill<br>
+        <kbd>L</kbd> line · <kbd>R</kbd> rect · <kbd>O</kbd> ellipse · <kbd>G</kbd> fill · <kbd>H</kbd> pan<br>
+        <kbd>+</kbd> <kbd>−</kbd> zoom · <kbd>0</kbd> fit · <kbd>1</kbd> actual size · <kbd>Ctrl</kbd>+wheel<br>
         <kbd>Space</kbd> play/stop · <kbd>N</kbd> new frame · <kbd>D</kbd> duplicate<br>
         <kbd>←</kbd><kbd>→</kbd> move selection / change frame<br>
         <kbd>Del</kbd> delete selection, else the frame · <kbd>Esc</kbd> deselect<br>
@@ -252,6 +335,7 @@ kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2p
 <input type="file" id="file-img" accept="image/*" multiple hidden>
 <input type="file" id="file-proj" accept="application/json,.json" hidden>
 <input type="file" id="file-ref" accept="image/*" hidden>
+<div id="toasts" aria-live="polite"></div>
 
 <script>
 "use strict";
@@ -267,19 +351,33 @@ let tool = 'brush', shape = null, styleMode = 'fill';
 let playing = false, playTimer = null, onion = false;
 let selectedFont = 'Arial', bold = false, italic = false;
 let dirty = false, syncing = false;
-let ref = null;   // tracing underlay: {img, alpha, zoom, fit, x, y, visible, move}
+let ref = null;   // tracing underlay: {img, alpha, zoom, fit, x, y, visible, move, locked}
+let zoom = 1;
+
+/* Canvas units per CSS pixel. Handle sizes and grab tolerances are drawn and
+   tested in canvas units, but they need to stay a constant size on screen -
+   otherwise they shrink as you zoom out, exactly when they are hardest to
+   hit. Every screen-space measurement below is multiplied by this. */
+function perPx() {
+  const r = view.getBoundingClientRect();
+  return r.width ? W / r.width : 1;
+}
 
 const undoStack = [], redoStack = [], HISTORY_MAX = 30;
 const measure = document.createElement('canvas').getContext('2d');
 
 /* ------------------------------------------------------------- frame model */
-function makeCanvas(w, h) {
+function makeCanvas(w, h, readOften) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
+  // Frame layers and the export buffer are read back constantly (history
+  // snapshots, drag snapshots, quantising). Priming the context tells the
+  // browser to keep them CPU-side instead of round-tripping the GPU.
+  if (readOften) c.getContext('2d', { willReadFrequently: true });
   return c;
 }
 function newFrame(delay) {
-  return { cv: makeCanvas(W, H), objs: [], delay: delay || +$('delay').value || 120 };
+  return { cv: makeCanvas(W, H, true), objs: [], delay: delay || +$('delay').value || 120 };
 }
 const F = () => frames[cur];
 const fctx = () => frames[cur].cv.getContext('2d');
@@ -356,10 +454,13 @@ function toWorld(o, lx, ly) {
   return { x: o.x + lx * Math.cos(a) - ly * Math.sin(a), y: o.y + lx * Math.sin(a) + ly * Math.cos(a) };
 }
 function hitTest(p) {
-  const objs = F().objs;
+  const objs = F().objs, u = perPx();
+  const pad = 6 * u;              // forgiving edge
+  const min = 11 * u;             // a tiny object still gets a grabbable box
   for (let i = objs.length - 1; i >= 0; i--) {
     const o = objs[i], l = toLocal(o, p);
-    if (Math.abs(l.x) <= o.w / 2 + 4 && Math.abs(l.y) <= o.h / 2 + 4) return i;
+    if (Math.abs(l.x) <= Math.max(o.w / 2, min) + pad &&
+        Math.abs(l.y) <= Math.max(o.h / 2, min) + pad) return i;
   }
   return -1;
 }
@@ -368,7 +469,7 @@ function handlePoints(o) {
   return {
     nw: toWorld(o, -hw, -hh), ne: toWorld(o, hw, -hh),
     sw: toWorld(o, -hw, hh), se: toWorld(o, hw, hh),
-    rot: toWorld(o, 0, -hh - 26)
+    rot: toWorld(o, 0, -hh - 26 * perPx())
   };
 }
 
@@ -402,26 +503,61 @@ function repaint(ghost) {
 }
 function drawSelection() {
   const o = selObj();
-  if (!o) { sel = -1; return; }
-  const h = handlePoints(o);
+  if (!o) return;
+  const h = handlePoints(o), u = perPx();
+  const box = () => {
+    vctx.beginPath();
+    vctx.moveTo(h.nw.x, h.nw.y); vctx.lineTo(h.ne.x, h.ne.y);
+    vctx.lineTo(h.se.x, h.se.y); vctx.lineTo(h.sw.x, h.sw.y);
+    vctx.closePath();
+  };
+  const top = toWorld(o, 0, -o.h / 2);
   vctx.save();
   vctx.globalAlpha = 1;
-  vctx.strokeStyle = '#4c8dff';
-  vctx.lineWidth = 1.5;
-  vctx.setLineDash([6, 4]);
-  vctx.beginPath();
-  vctx.moveTo(h.nw.x, h.nw.y); vctx.lineTo(h.ne.x, h.ne.y);
-  vctx.lineTo(h.se.x, h.se.y); vctx.lineTo(h.sw.x, h.sw.y);
-  vctx.closePath(); vctx.stroke();
+  vctx.lineJoin = vctx.lineCap = 'round';
+  // white underlay first, so the outline reads on dark and light artwork alike
+  vctx.strokeStyle = 'rgba(255,255,255,.9)';
+  vctx.lineWidth = 3.5 * u;
   vctx.setLineDash([]);
-  const top = toWorld(o, 0, -o.h / 2);
+  box(); vctx.stroke();
   vctx.beginPath(); vctx.moveTo(top.x, top.y); vctx.lineTo(h.rot.x, h.rot.y); vctx.stroke();
+  vctx.strokeStyle = '#4c8dff';
+  vctx.lineWidth = 1.6 * u;
+  vctx.setLineDash([7 * u, 4 * u]);
+  box(); vctx.stroke();
+  vctx.setLineDash([]);
+  vctx.beginPath(); vctx.moveTo(top.x, top.y); vctx.lineTo(h.rot.x, h.rot.y); vctx.stroke();
+  const r = 5.5 * u;
   vctx.fillStyle = '#fff';
-  [h.nw, h.ne, h.sw, h.se].forEach(p => {
-    vctx.beginPath(); vctx.rect(p.x - 5, p.y - 5, 10, 10); vctx.fill(); vctx.stroke();
+  vctx.strokeStyle = '#2563eb';
+  vctx.lineWidth = 1.6 * u;
+  [h.nw, h.ne, h.sw, h.se].forEach(q => {
+    vctx.beginPath(); vctx.rect(q.x - r, q.y - r, r * 2, r * 2); vctx.fill(); vctx.stroke();
   });
-  vctx.beginPath(); vctx.arc(h.rot.x, h.rot.y, 6, 0, Math.PI * 2); vctx.fill(); vctx.stroke();
+  vctx.beginPath(); vctx.arc(h.rot.x, h.rot.y, r * 1.15, 0, Math.PI * 2); vctx.fill(); vctx.stroke();
   vctx.restore();
+}
+
+/* ------------------------------------------------------------ zoom & pan */
+/* Zoom is pure CSS sizing on the shell. pos() converts pointer coordinates
+   through getBoundingClientRect(), so it stays correct at any zoom without
+   the drawing code knowing zoom exists. */
+function applyZoom() {
+  const shell = $('shell');
+  shell.style.width = Math.round(W * zoom) + 'px';
+  shell.style.height = Math.round(H * zoom) + 'px';
+  $('zoom-val').textContent = Math.round(zoom * 100) + '%';
+  $('canvas-dims').textContent = W + ' \u00d7 ' + H + ' px';
+  repaint();
+}
+function setZoom(z) {
+  zoom = Math.min(8, Math.max(0.1, z));
+  applyZoom();
+}
+function zoomFit() {
+  const vp = $('viewport');
+  const z = Math.min((vp.clientWidth - 28) / W, (vp.clientHeight - 28) / H);
+  setZoom(z > 0 ? z : 1);
 }
 
 /* ---------------------------------------------------------------- history */
@@ -590,7 +726,7 @@ function stopPlay() {
 /* ------------------------------------------------------------ tool setup */
 function setTool(t, sh) {
   tool = t; shape = sh || null;
-  document.querySelectorAll('#tools button,#stamps button').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('#tools button[data-tool],#stamps button').forEach(b => b.classList.remove('on'));
   const btn = document.querySelector(sh ? '#stamps [data-shape="' + sh + '"]' : '#tools [data-tool="' + t + '"]');
   if (btn) btn.classList.add('on');
   if (t !== 'select') sel = -1;
@@ -602,10 +738,13 @@ function setTool(t, sh) {
     line: 'Line — drag. Hold Shift to snap to 45°.', rect: 'Rectangle — drag from corner to corner.',
     ellipse: 'Ellipse — drag. Hold Shift for a circle.', fill: 'Fill — click an area to flood fill the pixel layer.',
     text: 'Text — click the canvas to place your text.', eyedrop: 'Picker — click to sample a colour.',
+    pan: 'Pan - drag to move around the canvas. Ctrl+wheel zooms.',
     stamp: 'Stamp (' + sh + ') — click, or drag to set the size.'
   };
   $('hint').textContent = msgs[sh ? 'stamp' : t] || '';
-  view.style.cursor = t === 'select' ? 'default' : (t === 'fill' || t === 'eyedrop' ? 'cell' : 'crosshair');
+  view.style.cursor = t === 'pan' ? 'grab'
+    : t === 'select' ? 'default'
+    : (t === 'fill' || t === 'eyedrop' ? 'cell' : 'crosshair');
   repaint();
 }
 
@@ -651,6 +790,12 @@ function editSel(fn, key) {
 /* ------------------------------------------------------------ pointer ops */
 let drawing = false, moved = false, start = null, snapshot = null, shiftKey = false;
 let mode = null, grab = null;
+/* Selecting an object is not an edit. Transform gestures therefore arm the
+   history here and only commit an entry on the first actual movement, so a
+   plain click to select never lands in the undo stack. */
+let pendingHist = false;
+function armHistory() { pendingHist = true; }
+function fireHistory() { if (pendingHist) { pendingHist = false; pushHistory(); } }
 
 function pos(e) {
   const r = view.getBoundingClientRect();
@@ -678,7 +823,16 @@ view.addEventListener('pointerdown', e => {
   moved = false;
   start = p;
 
-  if (ref && ref.move && ref.img) {          // panning the guide, not drawing
+  if (tool === 'pan' || e.button === 1) {    // moving the view, not the art
+    drawing = true;
+    mode = 'pan';
+    const vp = $('viewport');
+    grab = { sx: vp.scrollLeft, sy: vp.scrollTop, cx: e.clientX, cy: e.clientY };
+    view.style.cursor = 'grabbing';
+    return;
+  }
+
+  if (ref && ref.move && ref.img && !ref.locked) {   // panning the guide
     drawing = true;
     mode = 'ref';
     grab = { x: ref.x, y: ref.y, px: p.x, py: p.y };
@@ -692,11 +846,12 @@ view.addEventListener('pointerdown', e => {
     const o = selObj();
     if (o) {
       const h = handlePoints(o);
-      const near = (q, d) => Math.hypot(p.x - q.x, p.y - q.y) < d;
-      if (near(h.rot, 11)) { pushHistory(); mode = 'rotate'; drawing = true; return; }
+      const u = perPx();
+      const near = (q, d) => Math.hypot(p.x - q.x, p.y - q.y) < d * u;
+      if (near(h.rot, 14)) { armHistory(); mode = 'rotate'; drawing = true; return; }
       for (const k of ['nw', 'ne', 'sw', 'se']) {
-        if (near(h[k], 10)) {
-          pushHistory();
+        if (near(h[k], 13)) {
+          armHistory();
           mode = 'scale';
           grab = { w: o.w, h: o.h, size: o.size, d: Math.hypot(toLocal(o, p).x, toLocal(o, p).y) };
           drawing = true;
@@ -707,7 +862,7 @@ view.addEventListener('pointerdown', e => {
     const hit = hitTest(p);
     sel = hit;
     if (hit >= 0) {
-      pushHistory();
+      armHistory();
       mode = 'move';
       grab = { x: F().objs[hit].x, y: F().objs[hit].y, px: p.x, py: p.y };
       drawing = true;
@@ -768,20 +923,27 @@ view.addEventListener('pointermove', e => {
   moved = true;
   const o = selObj();
 
-  if (mode === 'ref' && ref) {
+  if (mode === 'pan') {
+    const vp = $('viewport');
+    vp.scrollLeft = grab.sx - (e.clientX - grab.cx);
+    vp.scrollTop = grab.sy - (e.clientY - grab.cy);
+  } else if (mode === 'ref' && ref) {
     ref.x = grab.x + (p.x - grab.px);
     ref.y = grab.y + (p.y - grab.py);
     repaint();
   } else if (mode === 'move' && o) {
+    fireHistory();
     o.x = grab.x + (p.x - grab.px);
     o.y = grab.y + (p.y - grab.py);
     repaint();
   } else if (mode === 'rotate' && o) {
+    fireHistory();
     let a = Math.atan2(p.y - o.y, p.x - o.x) + Math.PI / 2;
     if (shiftKey) a = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);
     o.rot = a;
     repaint();
   } else if (mode === 'scale' && o) {
+    fireHistory();
     const l = toLocal(o, p);
     if (o.type === 'text') {
       const d = Math.hypot(l.x, l.y);
@@ -817,6 +979,8 @@ view.addEventListener('pointermove', e => {
 window.addEventListener('pointerup', () => {
   if (!drawing) return;
   drawing = false;
+  pendingHist = false;                      // a click that only selected: nothing to record
+  if (mode === 'pan') { mode = null; grab = null; view.style.cursor = tool === 'pan' ? 'grab' : ''; setTool(tool, shape); return; }
   if (mode === 'ref') { mode = null; grab = null; repaint(); return; }
   const wasCreate = mode === 'create';
   mode = null; grab = null;
@@ -830,6 +994,7 @@ window.addEventListener('pointerup', () => {
 function hoverCursor(p) {
   const o = selObj();
   let cur = 'default';
+  if (ref && ref.move && !ref.locked) { view.style.cursor = 'move'; return; }
   if (o) {
     const h = handlePoints(o);
     const near = (q, d) => Math.hypot(p.x - q.x, p.y - q.y) < d;
@@ -1064,7 +1229,9 @@ async function exportGIF() {
   const maxColors = Math.min(256, +$('max-colors').value - (transparent ? 1 : 0));
 
   progress(0.02, 'Rendering frames…');
-  const tmp = makeCanvas(ow, oh), tc = tmp.getContext('2d');
+  lastYield = performance.now();
+  await tick();                       // let the progress bar paint before we block
+  const tmp = makeCanvas(ow, oh, true), tc = tmp.getContext('2d');
   const imgs = [];
   for (let i = 0; i < frames.length; i++) {
     tc.setTransform(1, 0, 0, 1, 0, 0);
@@ -1075,8 +1242,8 @@ async function exportGIF() {
     renderFrame(tc, frames[i]);
     tc.restore();
     imgs.push(tc.getImageData(0, 0, ow, oh));
-    await tick();
     progress(.02 + .18 * (i + 1) / frames.length);
+    await maybeYield();
   }
 
   progress(.22, 'Choosing colours…');
@@ -1105,7 +1272,7 @@ async function exportGIF() {
 
   for (let i = 0; i < imgs.length; i++) {
     progress(.25 + .7 * i / imgs.length, 'Encoding frame ' + (i + 1) + '/' + imgs.length + '…');
-    await tick();
+    await maybeYield();
     const d = imgs[i].data;
     const px = new Uint8Array(ow * oh);
     for (let j = 0, k = 0; j < d.length; j += 4, k++) {
@@ -1129,11 +1296,24 @@ async function exportGIF() {
   progress(-1);
   sel = keep;
   repaint();
-  flash('✅ Saved animation.gif — ' + (blob.size / 1024).toFixed(0) + ' KB, ' + frames.length + ' frames.');
+  toast('Saved animation.gif — ' + (blob.size / 1024).toFixed(0) + ' KB, ' + frames.length +
+        (frames.length === 1 ? ' frame.' : ' frames.'), 'good');
+  flash('Export complete.');
   dirty = false;
 }
 
 const tick = () => new Promise(r => setTimeout(r, 0));
+/* Yield to the browser only when we have actually held the thread a while.
+   Yielding once per frame is wasteful, and a backgrounded tab throttles
+   chained timers to roughly one per second, which turned a 250ms export
+   into a six second one. */
+let lastYield = 0;
+async function maybeYield() {
+  const now = performance.now();
+  if (now - lastYield < 50) return;
+  lastYield = now;
+  await tick();
+}
 function progress(v, msg) {
   const bar = $('bar');
   if (v < 0) { bar.style.display = 'none'; return; }
@@ -1148,6 +1328,20 @@ function download(blob, name) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
+function toast(msg, kind) {
+  const host = $('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind ? ' ' + kind : '');
+  el.textContent = msg;
+  host.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('in'));
+  setTimeout(() => {
+    el.classList.remove('in');
+    setTimeout(() => el.remove(), 250);
+  }, 3600);
+  return el;
+}
+
 let flashTimer;
 function flash(msg) {
   $('hint').textContent = msg;
@@ -1180,13 +1374,14 @@ function saveProject() {
   };
   download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'frame-studio-project.json');
   dirty = false;
+  toast('Project saved.', 'good');
 }
 function loadProject(file) {
   const fr = new FileReader();
   fr.onload = () => {
     let data;
-    try { data = JSON.parse(fr.result); } catch { flash('That file is not a Frame Studio project.'); return; }
-    if (!data.frames || !data.frames.length) { flash('No frames in that project.'); return; }
+    try { data = JSON.parse(fr.result); } catch { toast('That is not a Frame Studio project file.', 'bad'); return; }
+    if (!data.frames || !data.frames.length) { toast('That project has no frames in it.', 'bad'); return; }
     resize(data.w || 500, data.h || 500, false);
     frames.length = 0;
     let pending = data.frames.length;
@@ -1197,7 +1392,11 @@ function loadProject(file) {
       const img = new Image();
       img.onload = () => {
         f.cv.getContext('2d').drawImage(img, 0, 0);
-        if (--pending === 0) { cur = 0; sel = -1; renderTimeline(); refreshAll(); flash('Project loaded — ' + frames.length + ' frames.'); }
+        if (--pending === 0) {
+          cur = 0; sel = -1; renderTimeline(); refreshAll();
+          if (zoomIsFit) zoomFit();
+          toast('Project loaded — ' + frames.length + ' frames.', 'good');
+        }
       };
       img.src = fd.png;
     });
@@ -1211,7 +1410,7 @@ function resize(nw, nh, rescale = true) {
   const sx = nw / W, sy = nh / H, s = Math.min(sx, sy);
   const ox = (nw - W * s) / 2, oy = (nh - H * s) / 2;
   frames.forEach(f => {
-    const c = makeCanvas(nw, nh);
+    const c = makeCanvas(nw, nh, true);
     if (rescale) c.getContext('2d').drawImage(f.cv, ox, oy, W * s, H * s);
     f.cv = c;
     if (rescale) f.objs.forEach(o => {
@@ -1226,6 +1425,8 @@ function resize(nw, nh, rescale = true) {
   sel = -1;
   updateHistoryButtons();
   renderTimeline(); refreshAll();
+  applyZoom();
+  if (zoomIsFit) zoomFit();
 }
 
 /* ------------------------------------------------------------------ fonts */
@@ -1267,7 +1468,7 @@ const fontNames = availableFonts();
 if (!fontNames.includes(selectedFont)) selectedFont = fontNames[0] || 'sans-serif';
 
 /* ---------------------------------------------------------------- wiring */
-document.querySelectorAll('#tools button').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+document.querySelectorAll('#tools button[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
 document.querySelectorAll('#stamps button').forEach(b => b.onclick = () => setTool('stamp', b.dataset.shape));
 
 $('mode-fill').onclick = () => { styleMode = 'fill'; $('mode-fill').classList.add('on'); $('mode-stroke').classList.remove('on'); editSel(o => o.mode = 'fill'); };
@@ -1337,12 +1538,23 @@ function refZoom(pct) {
 }
 function refSetMove(on) {
   if (!ref) return;
+  if (on && ref.locked) { toast('The reference is locked. Unlock it to move it.', 'bad'); return; }
   ref.move = on;
   $('ref-move').classList.toggle('on', on);
   if (on) {
     view.style.cursor = 'move';
     $('hint').textContent = 'Move mode - drag the canvas to position the reference. Click Move again to draw.';
   } else setTool(tool, shape);
+}
+function refSetLock(on) {
+  if (!ref) return;
+  ref.locked = on;
+  const b = $('ref-lock');
+  b.classList.toggle('on', on);
+  b.innerHTML = on ? '&#128274; Locked' : '&#128275; Unlocked';
+  if (on && ref.move) refSetMove(false);
+  $('ref-move').disabled = on;
+  toast(on ? 'Reference locked in place.' : 'Reference unlocked.');
 }
 function refClear() {
   if (ref && ref.img && ref.img.src.startsWith('blob:')) URL.revokeObjectURL(ref.img.src);
@@ -1355,17 +1567,22 @@ function refClear() {
 function refLoad(file) {
   const img = new Image();
   img.onload = () => {
-    ref = { img, alpha: +$('ref-alpha').value / 100, zoom: 1, fit: 1, x: 0, y: 0, visible: true, move: false };
+    const wasLocked = ref && ref.locked;
+    ref = { img, alpha: +$('ref-alpha').value / 100, zoom: 1, fit: 1, x: 0, y: 0, visible: true, move: false, locked: false };
+    if (wasLocked) refSetLock(false);
     refFit();
     $('ref-controls').style.display = '';
     $('ref-load').textContent = '\u{1F4CE} Replace reference\u2026';
     $('ref-show').classList.add('on');
     $('ref-show').textContent = '\u{1F441} Shown';
     $('ref-move').classList.remove('on');
+    $('ref-move').disabled = false;
+    $('ref-lock').classList.remove('on');
+    $('ref-lock').innerHTML = '&#128275; Unlocked';
     repaint();
-    flash('Reference loaded - trace over it, it stays out of the export.');
+    toast('Reference loaded. It will never appear in the export.', 'good');
   };
-  img.onerror = () => flash('Could not read that image.');
+  img.onerror = () => toast('That file could not be read as an image.', 'bad');
   img.src = URL.createObjectURL(file);
 }
 
@@ -1382,7 +1599,27 @@ $('ref-show').onclick = e => {
   e.currentTarget.textContent = ref.visible ? '\u{1F441} Shown' : '\u{1F6AB} Hidden';
   repaint();
 };
-$('ref-clear').onclick = refClear;
+$('ref-lock').onclick = () => refSetLock(!(ref && ref.locked));
+$('ref-replace').onclick = () => $('file-ref').click();
+$('ref-clear').onclick = () => { refClear(); toast('Reference removed.'); };
+
+let zoomIsFit = true;
+$('zoom-in').onclick = () => { zoomIsFit = false; setZoom(zoom * 1.25); };
+$('zoom-out').onclick = () => { zoomIsFit = false; setZoom(zoom / 1.25); };
+$('zoom-100').onclick = () => { zoomIsFit = false; setZoom(1); };
+$('zoom-fit').onclick = () => { zoomIsFit = true; zoomFit(); };
+view.addEventListener('wheel', e => {
+  if (!e.ctrlKey) return;                 // plain wheel still scrolls the viewport
+  e.preventDefault();
+  zoomIsFit = false;
+  setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12));
+}, { passive: false });
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => { if (zoomIsFit) zoomFit(); }, 150);
+});
+$('show-checker').onchange = e => $('shell').classList.toggle('flat', !e.target.checked);
 
 $('btn-add').onclick = addFrame;
 $('btn-dup').onclick = duplicateFrame;
@@ -1392,7 +1629,24 @@ $('btn-flatten').onclick = flatten;
 $('btn-clear').onclick = () => { pushHistory(); fctx().clearRect(0, 0, W, H); F().objs = []; sel = -1; commit(); syncSelPanel(); };
 $('btn-undo').onclick = undo;
 $('btn-redo').onclick = redo;
-$('btn-export').onclick = () => exportGIF().catch(err => { console.error(err); progress(-1); flash('❌ Export failed: ' + err.message); });
+$('btn-export').onclick = async () => {
+  const b = $('btn-export');
+  if (b.disabled) return;                 // a second click must not start a second encode
+  const label = b.textContent;
+  b.disabled = true;
+  b.textContent = '⏳ Exporting…';
+  try {
+    await exportGIF();
+  } catch (err) {
+    console.error(err);
+    progress(-1);
+    toast('Export failed: ' + err.message, 'bad');
+    flash('Export failed — see the console for details.');
+  } finally {
+    b.disabled = false;
+    b.textContent = label;
+  }
+};
 $('btn-import').onclick = () => $('file-img').click();
 $('file-img').onchange = e => { importImages(e.target.files); e.target.value = ''; };
 $('btn-save-proj').onclick = saveProject;
@@ -1417,7 +1671,11 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k === 'd') { e.preventDefault(); duplicateSelection(); return; }
   if (e.ctrlKey || e.metaKey) return;
   if (e.key === 'Escape') { sel = -1; syncSelPanel(); repaint(); return; }
-  const map = { v: 'select', b: 'brush', e: 'eraser', t: 'text', l: 'line', r: 'rect', o: 'ellipse', g: 'fill', i: 'eyedrop' };
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIsFit = false; setZoom(zoom * 1.25); return; }
+  if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomIsFit = false; setZoom(zoom / 1.25); return; }
+  if (e.key === '0') { e.preventDefault(); zoomIsFit = true; zoomFit(); return; }
+  if (e.key === '1') { e.preventDefault(); zoomIsFit = false; setZoom(1); return; }
+  const map = { v: 'select', b: 'brush', e: 'eraser', t: 'text', l: 'line', r: 'rect', o: 'ellipse', g: 'fill', i: 'eyedrop', h: 'pan' };
   if (map[k]) { setTool(map[k]); return; }
   if (k === 'n') addFrame();
   else if (k === 'd') duplicateFrame();
@@ -1447,6 +1705,8 @@ renderTimeline();
 updateHistoryButtons();
 setTool('brush');
 refreshAll();
+applyZoom();
+zoomFit();
 </script>
 </body>
 </html>
