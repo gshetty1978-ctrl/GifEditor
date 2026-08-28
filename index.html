@@ -135,7 +135,7 @@ html[data-theme="light"] button.danger{color:#b42222;border-color:#e4bcbc}
 html[data-theme="light"] button.danger:hover{background:#fbe6e6}
 
 /* ---- swatches ---- */
-.swatches{display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin-top:8px}
+.swatches{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
 .swatches button{padding:0;height:20px;border-radius:5px;border:1px solid var(--line)}
 .swatches button.on{outline:2px solid var(--accent);outline-offset:1px}
 .recents{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
@@ -171,6 +171,21 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
   background:var(--panel2);border:1px solid var(--line);font-size:10px;line-height:18px;
   text-align:center;cursor:grab;opacity:0;transition:.12s}
 .fr:hover .grip{opacity:1}
+
+/* ---- desktop app shell ----
+   Each column now scrolls on its own inside the window instead of stretching
+   the page to the height of the tallest one. Without this the side panels
+   drag the timeline a couple of thousand pixels below the canvas and leave a
+   void beside it. Narrow screens keep the plain stacked layout. */
+@media(min-width:1101px){
+  html,body{overflow:hidden}
+  body{display:flex;flex-direction:column}
+  .wrap{flex:1;min-height:0;grid-template-rows:minmax(0,1fr) auto;align-items:stretch}
+  .wrap > .panel{overflow:auto;max-height:100%}
+  .stage{height:100%}
+  .viewport{flex:1;max-height:none}
+  .timeline{max-height:34vh;overflow:auto}
+}
 
 #restore-bar{display:none;align-items:center;gap:10px;margin:0 12px;padding:9px 12px;font-size:13px;
   background:#1e2a1f;border:1px solid #2f5133;border-left:3px solid var(--good);border-radius:8px}
@@ -253,6 +268,8 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <button data-tool="crop" title="Crop the canvas to a region — C">✂ Crop</button>
         <button data-tool="select" title="Select, move, resize and rotate — V">🖱️ Select</button>
         <button id="btn-flatten" title="Bake shapes and text into pixels">🔒 Flatten</button>
+        <button id="btn-place-img" title="Drop a picture into this frame as a movable object">🖼️ Insert image</button>
+        <button id="btn-frame-copy" title="Copy everything on this frame's layer to other frames">⧉ Frame to…</button>
       </div>
       <h3>View</h3>
       <div class="grid2">
@@ -303,6 +320,11 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <button id="sel-reset" title="Reset rotation">↺ 0°</button>
         <button id="sel-del" class="danger" title="Delete (Del)">🗑️ Delete</button>
       </div>
+      <div class="grid2" style="margin-top:6px">
+        <button id="sel-tonext" title="Put a copy of this on the next frame">→ Next frame</button>
+        <button id="sel-toall" title="Put a copy of this on every other frame, in the same place">⧉ All frames</button>
+      </div>
+      <label class="row" style="margin-top:6px">Fit image <button id="sel-fit" style="width:96px" title="Scale an imported picture to fill the canvas">⤢ To canvas</button></label>
       <p class="note">Drag the box to move · corner squares resize · top dot rotates. Editing colour, opacity or text below updates it live.</p>
     </div>
 
@@ -541,6 +563,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
 <input type="file" id="file-img" accept="image/*,.gif" multiple hidden>
 <input type="file" id="file-proj" accept="application/json,.json" hidden>
 <input type="file" id="file-ref" accept="image/*" hidden>
+<input type="file" id="file-place" accept="image/*" multiple hidden>
 <div id="toasts" aria-live="polite"></div>
 
 <div class="modal" id="fx-modal">
@@ -695,7 +718,11 @@ function drawObject(c, o) {
   c.fillStyle = c.strokeStyle = o.color;
   c.translate(o.x, o.y);
   if (o.rot) c.rotate(o.rot);
-  if (o.type === 'shape') {
+  if (o.type === 'image') {
+    // An imported picture is an object like any other, so Select moves,
+    // resizes and rotates it and Copy carries it to another frame.
+    if (o.img && o.img.complete && o.img.naturalWidth) c.drawImage(o.img, -o.w / 2, -o.h / 2, o.w, o.h);
+  } else if (o.type === 'shape') {
     c.scale(o.w / 100, o.h / 100);
     c.lineWidth = o.lw * 200 / Math.max(1, o.w + o.h);
     pathShape(c, o.kind, 0, 0, 100);
@@ -2586,7 +2613,7 @@ function projectData() {
       delay: f.delay, active: f.active,
       layers: f.layers.map(l => ({
         name: l.name, visible: l.visible, locked: l.locked, opacity: l.opacity,
-        blend: l.blend || 'source-over', objs: l.objs, png: l.cv.toDataURL('image/png')
+        blend: l.blend || 'source-over', objs: cleanObjs(l.objs), png: l.cv.toDataURL('image/png')
       }))
     }))
   };
@@ -2643,6 +2670,7 @@ function applyProject(data, done) {
       l.opacity = typeof ld.opacity === 'number' ? ld.opacity : 1;
       l.blend = ld.blend || 'source-over';
       l.objs = (Array.isArray(ld.objs) ? ld.objs : []).map(o => Object.assign({ id: nextObjId() }, o));
+      hydrateObjs(l.objs);
       return l;
     });
     frames[i] = f;
@@ -2686,26 +2714,24 @@ function importImages(files) {
   if (!stills.length) return;
   let pending = stills.length;
   pushStruct();
-  stills.forEach(file => {
+  stills.forEach(async file => {
     const img = new Image();
     img.onload = () => {
       const f = newFrame();
-      const c = f.layers[0].cv.getContext('2d');
-      const s = Math.min(W / img.width, H / img.height);
-      c.drawImage(img, (W - img.width * s) / 2, (H - img.height * s) / 2, img.width * s, img.height * s);
+      // as an object, not baked pixels, so it stays selectable afterwards
+      f.layers[0].objs.push(makeImageObject(img.src, img));
       frames.push(f);
       cur = frames.length - 1; sel = -1;
       dirty = true;
       renderTimeline(); refreshAll();
-      URL.revokeObjectURL(img.src);
       if (--pending === 0) toast('Imported ' + stills.length + (stills.length === 1 ? ' image.' : ' images.'), 'good');
     };
     img.onerror = () => {
-      URL.revokeObjectURL(img.src);
       toast('Could not read ' + file.name + '.', 'bad');
       if (--pending === 0) renderTimeline();
     };
-    img.src = URL.createObjectURL(file);
+    try { img.src = await readAsDataURL(file); }
+    catch (_) { img.src = URL.createObjectURL(file); }
   });
 }
 function saveProject() {
@@ -2715,7 +2741,7 @@ function saveProject() {
       delay: f.delay, active: f.active,
       layers: f.layers.map(l => ({
         name: l.name, visible: l.visible, locked: l.locked, opacity: l.opacity,
-        blend: l.blend || 'source-over', objs: l.objs, png: l.cv.toDataURL('image/png')
+        blend: l.blend || 'source-over', objs: cleanObjs(l.objs), png: l.cv.toDataURL('image/png')
       }))
     }))
   };
@@ -2750,6 +2776,7 @@ function loadProject(file) {
         l.opacity = typeof ld.opacity === 'number' ? ld.opacity : 1;
         l.blend = ld.blend || 'source-over';
         l.objs = (Array.isArray(ld.objs) ? ld.objs : []).map(o => Object.assign({ id: nextObjId() }, o));
+        hydrateObjs(l.objs);
         return l;
       });
       frames[i] = f;
@@ -3511,6 +3538,137 @@ async function exportWebM() {
   flash('Video export complete.');
 }
 
+/* ========================================================= image objects */
+/* An imported picture used to be flattened straight into the pixel layer,
+   which made it impossible to move afterwards or to get it onto a second
+   frame. It is an object now, so Select, Copy/Paste, the tweener and the
+   copy-to-frames buttons below all work on it for free. */
+function cleanObjs(objs) {
+  // the decoded <img> cannot be serialised; the data URL it came from can
+  return objs.map(o => {
+    if (o.type !== 'image') return o;
+    const c = Object.assign({}, o);
+    delete c.img;
+    return c;
+  });
+}
+function hydrateObjs(objs) {
+  objs.forEach(o => {
+    if (o.type !== 'image' || o.img || !o.src) return;
+    const im = new Image();
+    im.onload = () => { repaint(); drawThumb(cur); };
+    im.src = o.src;
+    o.img = im;
+  });
+}
+function makeImageObject(src, img, p) {
+  const s = Math.min(W / img.naturalWidth, H / img.naturalHeight, 1);
+  return {
+    id: nextObjId(), type: 'image', kind: 'image', src, img,
+    x: p ? p.x : W / 2, y: p ? p.y : H / 2, rot: 0, alpha: 1,
+    w: img.naturalWidth * s, h: img.naturalHeight * s,
+    color: '#ffffff', mode: 'fill', lw: 1
+  };
+}
+const readAsDataURL = file => new Promise((res, rej) => {
+  const fr = new FileReader();
+  fr.onload = () => res(fr.result);
+  fr.onerror = () => rej(new Error('could not read ' + file.name));
+  fr.readAsDataURL(file);
+});
+const loadImage = src => new Promise((res, rej) => {
+  const im = new Image();
+  im.onload = () => res(im);
+  im.onerror = () => rej(new Error('not a readable image'));
+  im.src = src;
+});
+/* Drop pictures into the frame you are on, as selectable objects. */
+async function insertImages(files) {
+  const list = [...files].filter(f => /^image\//.test(f.type) && !/gif$/i.test(f.type));
+  if (!list.length) { toast('Choose a PNG, JPEG or WebP — animated GIFs go through Import.', 'bad'); return; }
+  if (L().locked) { toast(L().name + ' is locked.', 'bad'); return; }
+  pushHistory();
+  let n = 0;
+  for (const file of list) {
+    try {
+      const src = await readAsDataURL(file);
+      const img = await loadImage(src);
+      const o = makeImageObject(src, img);
+      o.x += n * 18; o.y += n * 18;          // cascade, so a multi-drop is not one stack
+      L().objs.push(o);
+      sel = L().objs.length - 1;
+      n++;
+    } catch (err) { toast('Could not read ' + file.name + '.', 'bad'); }
+  }
+  if (!n) return;
+  setTool('select');
+  dirty = true;
+  commit(); syncSelPanel();
+  toast('Inserted ' + n + (n === 1 ? ' image' : ' images') + ' — drag to move, corners to resize.', 'good');
+}
+function fitSelToCanvas() {
+  const o = selObj();
+  if (!o) { toast('Select something first.', 'bad'); return; }
+  editSel(q => {
+    const ar = (q.type === 'image' && q.img && q.img.naturalWidth) ? q.img.naturalWidth / q.img.naturalHeight : q.w / q.h;
+    const s = Math.min(W / ar, H);
+    q.w = s * ar; q.h = s;
+    q.x = W / 2; q.y = H / 2; q.rot = 0;
+  });
+}
+
+/* =================================================== copying across frames */
+/* The copy keeps the same object id, which is what lets the tweener pair it
+   up with its twin on the next frame and interpolate between them. */
+function copySelToFrames(mode) {
+  const o = selObj();
+  if (!o) { toast('Select a shape, text or image first.', 'bad'); return; }
+  if (frames.length < 2) { toast('There is only one frame.', 'bad'); return; }
+  const targets = mode === 'next'
+    ? (frames[cur + 1] ? [frames[cur + 1]] : [])
+    : frames.filter(f => f !== F());
+  if (!targets.length) { toast('This is the last frame — nothing after it.', 'bad'); return; }
+  pushStruct();
+  let n = 0;
+  frames.forEach((f, i) => {
+    if (!targets.includes(f)) return;
+    const li = Math.min(f.active, f.layers.length - 1);
+    if (f.layers[li].locked) return;
+    const nf = { layers: f.layers.slice(), active: f.active, delay: f.delay };
+    const cl = cloneLayer(f.layers[li], true);
+    cl.objs = cl.objs.concat([Object.assign({}, o)]);
+    nf.layers[li] = cl;
+    frames[i] = nf;
+    n++;
+  });
+  dirty = true;
+  renderTimeline(); refreshAll();
+  toast('Copied onto ' + n + (n === 1 ? ' frame.' : ' frames.'), 'good');
+}
+/* Everything on this layer - pixels and objects - laid over the same layer of
+   every other frame. */
+function copyFrameToAll() {
+  if (frames.length < 2) { toast('There is only one frame.', 'bad'); return; }
+  const src = L();
+  pushStruct();
+  let n = 0;
+  frames.forEach((f, i) => {
+    if (f === F()) return;
+    const li = Math.min(f.active, f.layers.length - 1);
+    if (f.layers[li].locked) return;
+    const nf = { layers: f.layers.slice(), active: f.active, delay: f.delay };
+    const cl = cloneLayer(f.layers[li], true);
+    cl.cv.getContext('2d').drawImage(src.cv, 0, 0);
+    cl.objs = cl.objs.concat(src.objs.map(o => Object.assign({}, o)));
+    nf.layers[li] = cl;
+    frames[i] = nf;
+    n++;
+  });
+  dirty = true;
+  renderTimeline(); refreshAll();
+  toast('Laid this layer over ' + n + (n === 1 ? ' other frame.' : ' other frames.'), 'good');
+}
+
 /* ======================================================== command palette */
 const COMMANDS = [
   { g: 'Tool', n: 'Select tool', k: 'V', r: () => setTool('select') },
@@ -3567,7 +3725,12 @@ const COMMANDS = [
   { g: 'File', n: 'Save project', k: 'Ctrl+S', r: saveProject },
   { g: 'File', n: 'Open project…', r: () => $('file-proj').click() },
   { g: 'File', n: 'Import GIF or images…', r: () => $('file-img').click() },
-  { g: 'File', n: 'Load a reference image…', r: () => $('file-ref').click() }
+  { g: 'File', n: 'Load a reference image…', r: () => $('file-ref').click() },
+  { g: 'File', n: 'Insert an image into this frame…', r: () => $('file-place').click() },
+  { g: 'Frame', n: 'Copy selection to every frame', r: () => copySelToFrames('all') },
+  { g: 'Frame', n: 'Copy selection to the next frame', r: () => copySelToFrames('next') },
+  { g: 'Frame', n: 'Copy this layer onto every frame', r: copyFrameToAll },
+  { g: 'Edit', n: 'Fit selection to the canvas', r: fitSelToCanvas }
 ];
 let cmdMatches = [], cmdIdx = 0;
 function cmdRender() {
@@ -3665,6 +3828,12 @@ $('fx-reset').onclick = fxReset;
 $('fx-cancel').onclick = fxClose;
 $('fx-apply').onclick = fxApply;
 $('fx-modal').onclick = e => { if (e.target.id === 'fx-modal') fxClose(); };
+$('btn-place-img').onclick = () => $('file-place').click();
+$('file-place').onchange = e => { insertImages(e.target.files); e.target.value = ''; };
+$('btn-frame-copy').onclick = copyFrameToAll;
+$('sel-tonext').onclick = () => copySelToFrames('next');
+$('sel-toall').onclick = () => copySelToFrames('all');
+$('sel-fit').onclick = fitSelToCanvas;
 $('btn-reverse').onclick = reverseFrames;
 $('btn-pingpong').onclick = pingPong;
 $('btn-theme').onclick = () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
