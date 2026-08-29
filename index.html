@@ -9,7 +9,7 @@
 <meta property="og:title" content="Frame Studio — GIF Editor">
 <meta property="og:description" content="Draw frame-by-frame animations and export real GIFs, 100% in your browser.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%234c8dff'/%3E%3Ctext y='72' x='50' text-anchor='middle' font-size='60'%3E%F0%9F%8E%9E%EF%B8%8F%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%234c8dff'/%3E%3Crect x='9' y='13' width='46' height='38' rx='4' fill='%230f1115'/%3E%3Cg fill='%234c8dff'%3E%3Crect x='13' y='17' width='6' height='6' rx='1.6'/%3E%3Crect x='13' y='29' width='6' height='6' rx='1.6'/%3E%3Crect x='13' y='41' width='6' height='6' rx='1.6'/%3E%3Crect x='45' y='17' width='6' height='6' rx='1.6'/%3E%3Crect x='45' y='29' width='6' height='6' rx='1.6'/%3E%3Crect x='45' y='41' width='6' height='6' rx='1.6'/%3E%3C/g%3E%3Crect x='24' y='21' width='16' height='22' rx='2.5' fill='%238b5cf6'/%3E%3C/svg%3E">
 <style>
 :root{
   --bg:#0f1115; --panel:#181b22; --panel2:#20242e; --line:#2c313c;
@@ -117,6 +117,63 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-size:12px;line-height:1;cursor:pointer;border-radius:4px;flex:0 0 auto}
 .layer-row .mini:hover{background:#39415a}
 .layer-row .off{opacity:.38}
+/* ---- rails: the canvas is the point, so either side can get out of its way ----
+   The columns collapse to zero and the grid re-solves, which hands every
+   pixel they were using to the viewport. */
+@media(min-width:1101px){
+  .wrap.no-left{grid-template-columns:0 minmax(0,1fr) 230px}
+  .wrap.no-right{grid-template-columns:270px minmax(0,1fr) 0}
+  .wrap.no-left.no-right{grid-template-columns:0 minmax(0,1fr) 0}
+  .wrap.no-left > .panel:nth-of-type(1),
+  .wrap.no-right > .panel:nth-of-type(3){display:none}
+  .wrap.no-timeline #tl-head,.wrap.no-timeline .timeline{display:none}
+}
+.wrap.no-left > .panel:nth-of-type(1),
+.wrap.no-right > .panel:nth-of-type(3){display:none}
+.wrap.no-timeline #tl-head,.wrap.no-timeline .timeline{display:none}
+
+#pixsel-bar{display:none;align-items:center;gap:8px;width:100%;padding:8px 10px;font-size:12.5px;
+  background:var(--panel2);border:1px solid var(--line);border-radius:8px;flex-wrap:wrap}
+#pixsel-bar .grow{flex:1;color:var(--muted);min-width:110px}
+#pixsel-bar button{padding:6px 9px}
+
+/* ---- brand ---- */
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:inherit;flex:0 0 auto}
+.brand .mark{width:30px;height:30px;flex:0 0 auto}
+.brand .mark .film{fill:var(--panel2);stroke:var(--line);stroke-width:2}
+.brand .mark .holes rect{fill:var(--accent);opacity:.55}
+.brand .mark .cel{fill:var(--accent)}
+.brand:hover .mark .cel{fill:var(--accent2)}
+/* the cel advances like film through a gate, one frame at a time */
+.brand .mark .cel{animation:cel 3.2s steps(1,end) infinite}
+@keyframes cel{0%{opacity:1}70%{opacity:1}75%{opacity:.35}80%{opacity:1}}
+.brand .words{display:flex;flex-direction:column;line-height:1.05}
+.brand .words b{font-size:14px;font-weight:800;letter-spacing:.11em}
+.brand .words i{font-style:normal;font-size:10px;color:var(--muted);letter-spacing:.03em}
+@media(prefers-reduced-motion:reduce){.brand .mark .cel{animation:none}}
+
+/* ---- welcome ---- */
+#welcome .sheet{width:min(620px,100%);text-align:center;padding:30px 26px 22px}
+#welcome .mark{width:64px;height:64px;margin:0 auto 10px;display:block}
+#welcome .mark .film{fill:var(--panel2);stroke:var(--line);stroke-width:2}
+#welcome .mark .holes rect{fill:var(--accent);opacity:.55}
+#welcome .mark .cel{fill:var(--accent)}
+#welcome h1{margin:0;font-size:26px;font-weight:800;letter-spacing:.14em}
+#welcome .tag{color:var(--muted);margin:5px 0 20px;font-size:13.5px}
+.wcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;text-align:left}
+.wcard{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:13px;border-radius:10px;
+  background:var(--panel2);border:1px solid var(--line);cursor:pointer;transition:.13s}
+.wcard:hover{border-color:var(--accent);transform:translateY(-1px)}
+.wcard .big{font-size:20px;line-height:1}
+.wcard b{font-size:13.5px}
+.wcard span{font-size:11.5px;color:var(--muted);line-height:1.35}
+.wcard.resume{border-color:var(--good)}
+.wsizes{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:16px}
+.wsizes button{padding:6px 11px;font-size:12px}
+.wfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:18px;
+  color:var(--muted);font-size:11.5px}
+.wfoot label{display:flex;align-items:center;gap:6px;cursor:pointer}
+
 /* ---- timeline header and status bar ---- */
 #tl-head{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:0 2px;font-size:12px;color:var(--muted)}
 #tl-head .ttl{font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
@@ -269,15 +326,29 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
 <body>
 
 <header>
-  <h1>🎞️ Frame Studio</h1>
+  <a class="brand" href="#" id="brand" title="About Frame Studio">
+    <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="1" y="9" width="62" height="46" rx="7" class="film"/>
+      <g class="holes">
+        <rect x="6" y="15" width="7" height="7" rx="2"/><rect x="6" y="28" width="7" height="7" rx="2"/><rect x="6" y="41" width="7" height="7" rx="2"/>
+        <rect x="51" y="15" width="7" height="7" rx="2"/><rect x="51" y="28" width="7" height="7" rx="2"/><rect x="51" y="41" width="7" height="7" rx="2"/>
+      </g>
+      <rect class="cel" x="19" y="19" width="26" height="26" rx="4"/>
+    </svg>
+    <span class="words"><b>FRAME STUDIO</b><i>GIF editing. Simplified.</i></span>
+  </a>
   <span class="badge">offline · no libraries</span>
   <span class="saving" id="save-state"></span>
   <div class="spacer"></div>
+  <button id="btn-rail-l" class="on" title="Show or hide the tool rail">◧</button>
+  <button id="btn-rail-r" class="on" title="Show or hide the properties rail">◨</button>
+  <button id="btn-focus" title="Focus mode — hide both rails and the timeline (Tab)">⛶ Focus</button>
   <button id="btn-cmdk" title="Command palette (Ctrl+K)">⌘ Commands</button>
   <button id="btn-theme" title="Switch between dark and light">🌙 Dark</button>
   <button id="btn-undo" title="Undo (Ctrl+Z)">↶ Undo</button>
   <button id="btn-redo" title="Redo (Ctrl+Y)">↷ Redo</button>
   <button id="btn-import" title="Import a GIF as frames, or images as frames">📥 Import GIF / images</button>
+  <button id="btn-video" title="Sample a video file into frames">🎬 Video → frames</button>
   <button id="btn-save-proj">🗂️ Save project</button>
   <button id="btn-load-proj">📂 Open project</button>
   <button id="btn-export" class="violet">💾 Export GIF</button>
@@ -314,6 +385,8 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <input type="range" id="tol" min="0" max="160" value="24" title="How different a neighbouring pixel may be and still be filled">
       <h4>Edit</h4>
       <div class="grid2">
+        <button data-tool="marquee" title="Select a rectangle of pixels — M">▭ Marquee<span class="k">M</span></button>
+        <button data-tool="lasso" title="Draw a freehand pixel selection — Q">✎ Lasso<span class="k">Q</span></button>
         <button data-tool="crop" title="Crop the canvas to a region — C">✂ Crop<span class="k">C</span></button>
         <button data-tool="select" title="Select, move, resize and rotate — V">🖱️ Select<span class="k">V</span></button>
         <button id="btn-flatten" title="Bake shapes and text into pixels">🔒 Flatten</button>
@@ -388,6 +461,14 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <button id="mode-fill" class="on">Filled</button>
         <button id="mode-stroke">Outline</button>
       </div>
+      <label class="row" style="margin-top:8px">Gradient <input type="checkbox" id="grad-on" title="Fill shapes and text with a two-colour blend"></label>
+      <label class="row">Second colour <input type="color" id="color2" value="#8b5cf6"></label>
+      <label class="row">Angle <select id="grad-angle" style="width:104px">
+        <option value="0">→ Left to right</option>
+        <option value="90">↓ Top to bottom</option>
+        <option value="45">↘ Diagonal</option>
+        <option value="radial">◎ Radial</option>
+      </select></label>
       <label class="row" style="margin-top:10px">Opacity <span id="alpha-val" style="color:var(--text)">100%</span></label>
       <input type="range" id="alpha" min="5" max="100" value="100">
       <label class="row" style="margin-top:8px">Pen pressure <input type="checkbox" id="pressure-on" checked title="A stylus varies stroke width and opacity with how hard you press. Ignored by a mouse."></label>
@@ -401,6 +482,10 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <button id="bold-btn">B Bold</button>
         <button id="italic-btn"><i>I</i> Italic</button>
       </div>
+      <label class="row" style="margin-top:8px">Outline <input type="number" id="txt-stroke" value="0" min="0" max="40" style="width:70px" title="Width of an outline drawn around the letters"></label>
+      <label class="row">Outline colour <input type="color" id="txt-stroke-color" value="#000000"></label>
+      <label class="row">Shadow <input type="number" id="txt-shadow" value="0" min="0" max="60" style="width:70px" title="Softness of a drop shadow"></label>
+      <label class="row">Shadow colour <input type="color" id="txt-shadow-color" value="#000000"></label>
       <input type="text" id="font-search" placeholder="🔎 Search fonts…" style="margin-top:8px">
       <div class="fonts" id="font-list"></div>
       <p class="note">Click the canvas to place the text.</p>
@@ -420,6 +505,15 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <button id="btn-play" class="primary">▶️ Play</button>
       <label class="row" style="margin:0">Delay <input type="number" id="delay" value="120" min="20" step="10" style="width:78px"> ms</label>
       <button id="btn-delay-all" title="Apply this delay to every frame">↔ all</button>
+      <select id="fps-preset" style="width:104px" title="Set every frame's delay from a frame rate">
+        <option value="">FPS preset…</option>
+        <option value="8">8 fps</option><option value="12">12 fps</option><option value="15">15 fps</option>
+        <option value="24">24 fps</option><option value="30">30 fps</option><option value="50">50 fps</option>
+      </select>
+      <select id="play-speed" style="width:92px" title="Preview speed. Does not change the exported timing.">
+        <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+        <option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
+      </select>
       <span style="width:1px;height:22px;background:var(--line)"></span>
       <button id="btn-tween" title="Insert interpolated frames between this frame and the next">&#8669; Tween</button>
       <input type="number" id="tween-n" value="4" min="1" max="60" style="width:56px" title="How many in-between frames">
@@ -448,6 +542,15 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <span class="dims" id="canvas-dims">500 × 500 px</span>
     </div>
 
+    <div id="pixsel-bar">
+      <span class="grow" id="pixsel-info">Pixels selected.</span>
+      <button id="pix-object" title="Turn the selected pixels into an object you can move, resize, rotate and copy to other frames">🖼️ To object</button>
+      <button id="pix-copy" title="Copy the pixels, ready to paste — including onto another frame">📋 Copy</button>
+      <button id="pix-fill" title="Fill the selection with the current colour">🪣 Fill</button>
+      <button id="pix-crop" title="Crop the canvas to this selection">✂ Crop to it</button>
+      <button id="pix-del" class="danger" title="Erase the pixels inside the selection">🗑️ Delete</button>
+      <button id="pix-none">Deselect</button>
+    </div>
     <div id="crop-bar">
       <span class="grow" id="crop-info">Drag a rectangle on the canvas.</span>
       <button id="crop-trim" title="Shrink to the artwork's bounding box">⌴ Trim to content</button>
@@ -564,6 +667,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <div class="sec">
       <h3>📤 Export</h3>
       <label class="row">Background <input type="color" id="bg-color" value="#ffffff"></label>
+      <div class="swatches" id="bg-presets" style="grid-template-columns:repeat(7,1fr)"></div>
       <label class="row">Transparent <input type="checkbox" id="bg-transparent"></label>
       <label class="row">Loop forever <input type="checkbox" id="loop-forever" checked></label>
       <label class="row">Max colors <select id="max-colors" style="width:96px">
@@ -634,7 +738,36 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
 <input type="file" id="file-proj" accept="application/json,.json" hidden>
 <input type="file" id="file-ref" accept="image/*" hidden>
 <input type="file" id="file-place" accept="image/*" multiple hidden>
+<input type="file" id="file-video" accept="video/*" hidden>
 <div id="toasts" aria-live="polite"></div>
+
+<div class="modal" id="welcome">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Welcome to Frame Studio">
+    <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="1" y="9" width="62" height="46" rx="7" class="film"/>
+      <g class="holes">
+        <rect x="6" y="15" width="7" height="7" rx="2"/><rect x="6" y="28" width="7" height="7" rx="2"/><rect x="6" y="41" width="7" height="7" rx="2"/>
+        <rect x="51" y="15" width="7" height="7" rx="2"/><rect x="51" y="28" width="7" height="7" rx="2"/><rect x="51" y="41" width="7" height="7" rx="2"/>
+      </g>
+      <rect class="cel" x="19" y="19" width="26" height="26" rx="4"/>
+    </svg>
+    <h1>FRAME STUDIO</h1>
+    <p class="tag">Draw animated GIFs frame by frame. Everything runs in this tab — nothing is ever uploaded.</p>
+    <div class="wcards">
+      <div class="wcard resume" id="w-resume" style="display:none">
+        <span class="big">⏪</span><b>Continue</b><span id="w-resume-sub">Pick up your last session</span>
+      </div>
+      <div class="wcard" id="w-new"><span class="big">✨</span><b>New project</b><span>Start on a blank canvas</span></div>
+      <div class="wcard" id="w-import"><span class="big">📥</span><b>Import GIF or images</b><span>Open an existing animation, or a pile of stills</span></div>
+      <div class="wcard" id="w-open"><span class="big">📂</span><b>Open project</b><span>A .json you saved from here before</span></div>
+    </div>
+    <div class="wsizes" id="w-sizes"></div>
+    <div class="wfoot">
+      <label><input type="checkbox" id="w-skip"> Skip this next time</label>
+      <button id="w-close">Straight to the editor →</button>
+    </div>
+  </div>
+</div>
 
 <div class="modal" id="fx-modal">
   <div class="sheet" role="dialog" aria-modal="true" aria-label="Adjust and filter">
@@ -790,12 +923,28 @@ function pathShape(c, kind, x, y, s) {
   else if (kind === 'diamond') { c.moveTo(x, y - s / 2); c.lineTo(x + s / 2, y); c.lineTo(x, y + s / 2); c.lineTo(x - s / 2, y); c.closePath(); }
   else if (kind === 'cross') { c.rect(x - s / 6, y - s / 2, s / 3, s); c.rect(x - s / 2, y - s / 6, s, s / 3); }
 }
+/* A gradient is built in the object's own local space, so it rotates and
+   scales with the shape instead of staying pinned to the canvas. */
+function objPaint(c, o) {
+  if (!o.grad || !o.color2) return o.color;
+  const w = Math.max(1, o.w || o.size || 100), h = Math.max(1, o.h || o.size || 100);
+  let g;
+  if (o.gradAngle === 'radial') g = c.createRadialGradient(0, 0, 0, 0, 0, Math.max(w, h) / 2);
+  else {
+    const a = (+o.gradAngle || 0) * Math.PI / 180;
+    const dx = Math.cos(a) * w / 2, dy = Math.sin(a) * h / 2;
+    g = c.createLinearGradient(-dx, -dy, dx, dy);
+  }
+  g.addColorStop(0, o.color);
+  g.addColorStop(1, o.color2);
+  return g;
+}
 function drawObject(c, o) {
   c.save();
   c.globalAlpha *= o.alpha;
-  c.fillStyle = c.strokeStyle = o.color;
   c.translate(o.x, o.y);
   if (o.rot) c.rotate(o.rot);
+  c.fillStyle = c.strokeStyle = objPaint(c, o);
   if (o.type === 'image') {
     // An imported picture is an object like any other, so Select moves,
     // resizes and rotates it and Copy carries it to another frame.
@@ -810,10 +959,25 @@ function drawObject(c, o) {
     c.textAlign = 'center';
     c.textBaseline = 'middle';
     const lines = String(o.text).split('\n'), lh = o.size * 1.18;
+    if (o.shadow > 0) {
+      c.shadowBlur = o.shadow;
+      c.shadowColor = o.shadowColor || '#000000';
+      c.shadowOffsetY = Math.round(o.shadow / 3);
+    }
     lines.forEach((ln, i) => {
       const y = (i - (lines.length - 1) / 2) * lh;
+      // outline first, so the fill sits inside it rather than covering it
+      if (o.stroke > 0) {
+        c.save();
+        c.lineWidth = o.stroke * 2;
+        c.lineJoin = 'round';
+        c.strokeStyle = o.strokeColor || '#000000';
+        c.strokeText(ln, 0, y);
+        c.restore();
+      }
       if (o.mode === 'fill') c.fillText(ln, 0, y);
       else { c.lineWidth = Math.max(1, o.lw / 6); c.strokeText(ln, 0, y); }
+      c.shadowBlur = 0; c.shadowOffsetY = 0;
     });
   }
   c.restore();
@@ -933,8 +1097,10 @@ function repaint(ghost) {
     vctx.globalAlpha = 1;
   }
   renderFrame(vctx, F());
+  if (pixFloat) vctx.drawImage(pixFloat.cv, pixFloat.x + pixFloat.dx, pixFloat.y + pixFloat.dy);
   vctx.globalAlpha = 1;
   if ($('grid-on').checked && !playing) drawGrid();
+  if (!playing) drawPixSel();
   if (ghost) ghost(vctx);
   if (cropRect) drawCropOverlay();
   if (sel >= 0 && !playing) drawSelection();
@@ -1550,7 +1716,7 @@ function startPlay() {
     frames.forEach((f, k) => f.el && f.el.classList.toggle('sel', k === i));
     const d = F().delay;
     i = (i + 1) % frames.length;
-    playTimer = setTimeout(step, Math.max(20, d));
+    playTimer = setTimeout(step, Math.max(16, d / playSpeed));   // preview only; export keeps real timing
   };
   step();
 }
@@ -1565,6 +1731,8 @@ function stopPlay() {
 
 /* ------------------------------------------------------------ tool setup */
 function setTool(t, sh) {
+  if (typeof pixFloat !== 'undefined' && pixFloat && t !== tool) dropPixels();
+  if (t !== 'marquee' && t !== 'lasso' && typeof pixSel !== 'undefined' && pixSel) setPixSel(null);
   tool = t; shape = sh || null;
   document.querySelectorAll('#tools button[data-tool],#stamps button').forEach(b => b.classList.remove('on'));
   const btn = document.querySelector(sh ? '#stamps [data-shape="' + sh + '"]' : '#tools [data-tool="' + t + '"]');
@@ -1581,6 +1749,8 @@ function setTool(t, sh) {
     line: 'Line — drag. Hold Shift to snap to 45°.', rect: 'Rectangle — drag from corner to corner.',
     ellipse: 'Ellipse — drag. Hold Shift for a circle.', fill: 'Fill — click an area to flood fill the pixel layer.',
     text: 'Text — click the canvas to place your text.', eyedrop: 'Picker — click to sample a colour.',
+    marquee: 'Marquee — drag out a rectangle of pixels. Drag inside it to move them.',
+    lasso: 'Lasso — draw around the pixels you want. Drag inside to move them.',
     spray: 'Airbrush — hold and move. Size sets the spread, opacity the density.',
     smudge: 'Smudge — drag to pull colour along. Opacity sets the strength.',
     pan: 'Pan - drag to move around the canvas. Ctrl+wheel zooms.',
@@ -1610,6 +1780,9 @@ function syncSelPanel() {
   styleMode = o.mode;
   $('mode-fill').classList.toggle('on', o.mode === 'fill');
   $('mode-stroke').classList.toggle('on', o.mode === 'stroke');
+  $('grad-on').checked = !!o.grad;
+  if (o.color2) $('color2').value = o.color2;
+  if (o.gradAngle != null) $('grad-angle').value = o.gradAngle;
   if (o.type === 'text') {
     $('text-panel').style.display = '';
     $('text-input').value = o.text;
@@ -1617,6 +1790,10 @@ function syncSelPanel() {
     bold = o.bold; italic = o.italic; selectedFont = o.font;
     $('bold-btn').classList.toggle('on', bold);
     $('italic-btn').classList.toggle('on', italic);
+    $('txt-stroke').value = o.stroke || 0;
+    $('txt-stroke-color').value = o.strokeColor || '#000000';
+    $('txt-shadow').value = o.shadow || 0;
+    $('txt-shadow-color').value = o.shadowColor || '#000000';
   }
   syncing = false;
 }
@@ -1647,7 +1824,7 @@ let pendingHist = false;
 function armHistory() { pendingHist = true; }
 function fireHistory() { if (pendingHist) { pendingHist = false; pushHistory(); } }
 
-const FREEHAND = { brush: 1, eraser: 1, spray: 1, smudge: 1, pan: 1 };
+const FREEHAND = { brush: 1, eraser: 1, spray: 1, smudge: 1, pan: 1, lasso: 1 };
 function pos(e) {
   const r = view.getBoundingClientRect();
   const p = { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
@@ -1658,6 +1835,20 @@ function pos(e) {
 function paintStyle(c) {
   c.globalAlpha = +$('alpha').value / 100;
   c.strokeStyle = c.fillStyle = $('color').value;
+  if ($('grad-on').checked) {
+    // a canvas-wide ramp, so a stroke takes the colour of wherever it lands
+    const ang = $('grad-angle').value;
+    let g;
+    if (ang === 'radial') g = c.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) / 2);
+    else {
+      const a = (+ang || 0) * Math.PI / 180;
+      g = c.createLinearGradient(W / 2 - Math.cos(a) * W / 2, H / 2 - Math.sin(a) * H / 2,
+                                 W / 2 + Math.cos(a) * W / 2, H / 2 + Math.sin(a) * H / 2);
+    }
+    g.addColorStop(0, $('color').value);
+    g.addColorStop(1, $('color2').value);
+    c.strokeStyle = c.fillStyle = g;
+  }
   c.lineWidth = +$('size').value;
   c.lineCap = c.lineJoin = 'round';
   c.globalCompositeOperation = 'source-over';
@@ -1666,7 +1857,14 @@ function newObjBase(p) {
   return {
     id: nextObjId(),
     x: p.x, y: p.y, rot: 0, alpha: +$('alpha').value / 100,
-    color: $('color').value, mode: styleMode, lw: +$('size').value
+    color: $('color').value, mode: styleMode, lw: +$('size').value,
+    grad: $('grad-on').checked, color2: $('color2').value, gradAngle: $('grad-angle').value
+  };
+}
+function textStyleFromPanel() {
+  return {
+    stroke: +$('txt-stroke').value || 0, strokeColor: $('txt-stroke-color').value,
+    shadow: +$('txt-shadow').value || 0, shadowColor: $('txt-shadow-color').value
   };
 }
 
@@ -1748,7 +1946,7 @@ view.addEventListener('pointerdown', e => {
       : Object.assign(newObjBase(p), {
           type: 'text', text: $('text-input').value || ' ', font: selectedFont,
           size: +$('font-size').value || 48, bold, italic
-        });
+        }, textStyleFromPanel());
     if (o.type === 'text') measureObj(o);
     L().objs.push(o);
     sel = L().objs.length - 1;
@@ -1757,6 +1955,22 @@ view.addEventListener('pointerdown', e => {
     drawing = true;
     syncSelPanel();
     commit();
+    return;
+  }
+
+  /* ---- pixel selection ---- */
+  if (tool === 'marquee' || tool === 'lasso') {
+    if (pointInSel(p)) {                       // grab the pixels and drag them
+      pushHistory();
+      liftPixels();
+      drawing = true; mode = 'pixmove';
+      grab = { px: p.x, py: p.y };
+      return;
+    }
+    dropPixels();
+    drawing = true; mode = 'pixdraw';
+    grab = { x: p.x, y: p.y, pts: [{ x: p.x, y: p.y }] };
+    setPixSel(null);
     return;
   }
 
@@ -1803,6 +2017,25 @@ view.addEventListener('pointermove', e => {
     }
     setCropRect({ x: Math.min(grab.x, x), y: Math.min(grab.y, y),
                   w: Math.abs(x - grab.x), h: Math.abs(y - grab.y) });
+  } else if (mode === 'pixdraw') {
+    if (tool === 'marquee') {
+      let x = Math.max(0, Math.min(W, p.x)), y = Math.max(0, Math.min(H, p.y));
+      if (shiftKey) {
+        const d = Math.max(Math.abs(x - grab.x), Math.abs(y - grab.y));
+        x = grab.x + Math.sign(x - grab.x || 1) * d;
+        y = grab.y + Math.sign(y - grab.y || 1) * d;
+      }
+      grab.pts = [{ x: grab.x, y: grab.y }, { x, y: grab.y }, { x, y }, { x: grab.x, y }];
+    } else {
+      const last = grab.pts[grab.pts.length - 1];
+      if (Math.hypot(p.x - last.x, p.y - last.y) > 2.5) grab.pts.push({ x: p.x, y: p.y });
+    }
+    pixSel = { pts: grab.pts, rect: tool === 'marquee' };
+    repaint();
+  } else if (mode === 'pixmove' && pixFloat) {
+    pixFloat.dx = p.x - grab.px;
+    pixFloat.dy = p.y - grab.py;
+    repaint();
   } else if (mode === 'pan') {
     const vp = $('viewport');
     vp.scrollLeft = grab.sx - (e.clientX - grab.cx);
@@ -1872,6 +2105,15 @@ window.addEventListener('pointerup', () => {
     if (!cropRect || cropRect.w < 4 || cropRect.h < 4) setCropRect(null);
     return;
   }
+  if (mode === 'pixdraw') {
+    mode = null;
+    const pts = grab ? grab.pts : null;
+    grab = null;
+    const big = pts && pts.length > 2 && (() => { const b = selBounds(pts); return b.w > 3 && b.h > 3; })();
+    setPixSel(big ? pts : null, tool === 'marquee');
+    return;
+  }
+  if (mode === 'pixmove') { mode = null; grab = null; dropPixels(); setPixSel(pixSel ? pixSel.pts : null, pixSel && pixSel.rect); return; }
   if (mode === 'pan') { mode = null; grab = null; view.style.cursor = tool === 'pan' ? 'grab' : ''; setTool(tool, shape); return; }
   if (mode === 'ref') { mode = null; grab = null; repaint(); return; }
   const wasCreate = mode === 'create';
@@ -1935,7 +2177,7 @@ function ghostPreview(g, p) {
     : Object.assign(newObjBase(p), {
         type: 'text', text: $('text-input').value || ' ', font: selectedFont,
         size: +$('font-size').value || 48, bold, italic
-      });
+      }, textStyleFromPanel());
   drawObject(g, o);
   g.restore();
 }
@@ -2818,9 +3060,11 @@ function applyProject(data, done) {
 async function offerRestore() {
   let doc;
   try { doc = await idb('readonly', st => st.get(SLOT)); }
-  catch { return; }
-  if (!doc || !doc.data || !doc.data.frames || !doc.data.frames.length) return;
+  catch { showWelcome(null); return; }
+  if (!doc || !doc.data || !doc.data.frames || !doc.data.frames.length) { showWelcome(null); return; }
   const when = new Date(doc.at);
+  if (showWelcome(doc)) return;          // the welcome screen offers it instead
+
   $('restore-text').textContent =
     'Unsaved work from ' + when.toLocaleString() + ' — ' +
     doc.frames + (doc.frames === 1 ? ' frame' : ' frames') + '. Restore it?';
@@ -3257,7 +3501,8 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k === 'c') { e.preventDefault(); copySelection(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'v') { e.preventDefault(); pasteSelection(); return; }
   if (e.ctrlKey || e.metaKey) return;
-  if (e.key === 'Escape') { if (cropRect) { setCropRect(null); return; } sel = -1; syncSelPanel(); repaint(); return; }
+  if (e.key === 'Escape') { if (pixSelActive()) { dropPixels(); setPixSel(null); return; }
+    if (cropRect) { setCropRect(null); return; } sel = -1; syncSelPanel(); repaint(); return; }
   if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIsFit = false; setZoom(zoom * 1.25); return; }
   if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomIsFit = false; setZoom(zoom / 1.25); return; }
   if (e.key === '0') { e.preventDefault(); zoomIsFit = true; zoomFit(); return; }
@@ -3271,6 +3516,8 @@ window.addEventListener('keydown', e => {
     flash('Size ' + s.value + 'px');
     return;
   }
+  if (k === 'm') { setTool('marquee'); return; }
+  if (k === 'q') { setTool('lasso'); return; }
   if (e.key === ',') { selectFrame(cur - 1); return; }
   if (e.key === '.') { selectFrame(cur + 1); return; }
   if (k === 'x') {                               // flip between the last two colours
@@ -3295,7 +3542,11 @@ window.addEventListener('keydown', e => {
     } else if (e.key === 'ArrowLeft') selectFrame(cur - 1);
     else if (e.key === 'ArrowRight') selectFrame(cur + 1);
   }
-  else if (e.key === 'Delete' || e.key === 'Backspace') { sel >= 0 ? deleteSelection() : deleteFrame(cur); }
+  else if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (pixSelActive()) pixDelete();
+    else if (sel >= 0) deleteSelection();
+    else deleteFrame(cur);
+  }
   else if (e.key === ' ') { e.preventDefault(); togglePlay(); }
 });
 
@@ -3866,6 +4117,402 @@ function setLayerShared(on) {
   renderTimeline(); refreshAll();
 }
 
+/* ======================================================== pixel selection */
+/* Select and Copy have only ever worked on shapes, text and images. This is
+   the same for painted pixels: mark a region, then move, erase, fill or lift
+   it. "To object" turns the pixels into an image object, which hands them
+   the transform handles and the copy-to-frames buttons already built for
+   objects rather than reimplementing scaling and rotation here. */
+let pixSel = null;          // {pts:[{x,y}], rect:bool}
+let pixFloat = null;        // pixels lifted off the layer during a drag
+let antsPhase = 0, antsTimer = null;
+
+function selPath(pts, dx, dy) {
+  const path = new Path2D();
+  pts.forEach((q, i) => {
+    const x = q.x + (dx || 0), y = q.y + (dy || 0);
+    i ? path.lineTo(x, y) : path.moveTo(x, y);
+  });
+  path.closePath();
+  return path;
+}
+function selBounds(pts) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const q of pts) {
+    if (q.x < x0) x0 = q.x;
+    if (q.x > x1) x1 = q.x;
+    if (q.y < y0) y0 = q.y;
+    if (q.y > y1) y1 = q.y;
+  }
+  x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0));
+  x1 = Math.min(W, Math.ceil(x1)); y1 = Math.min(H, Math.ceil(y1));
+  return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) };
+}
+function pixSelActive() { return !!(pixSel && pixSel.pts.length > 2); }
+function setPixSel(pts, rect) {
+  pixSel = pts && pts.length > 2 ? { pts, rect: !!rect } : null;
+  const bar = $('pixsel-bar');
+  if (!pixSelActive()) {
+    bar.style.display = 'none';
+    stopAnts();
+  } else {
+    const b = selBounds(pixSel.pts);
+    bar.style.display = 'flex';
+    $('pixsel-info').textContent = (pixSel.rect ? 'Rectangle' : 'Lasso') + ' selection — ' +
+      b.w + ' \u00d7 ' + b.h + ' px. Drag inside it to move the pixels.';
+    startAnts();
+  }
+  repaint();
+}
+function startAnts() {
+  if (antsTimer) return;
+  antsTimer = setInterval(() => { antsPhase = (antsPhase + 1) % 8; if (!playing) repaint(); }, 110);
+}
+function stopAnts() {
+  clearInterval(antsTimer);
+  antsTimer = null;
+}
+function drawPixSel() {
+  if (!pixSelActive()) return;
+  const u = perPx();
+  const path = selPath(pixSel.pts, pixFloat ? pixFloat.dx : 0, pixFloat ? pixFloat.dy : 0);
+  vctx.save();
+  vctx.globalAlpha = 1;
+  vctx.lineWidth = 1.4 * u;
+  vctx.setLineDash([5 * u, 4 * u]);
+  vctx.lineDashOffset = -antsPhase * u;
+  vctx.strokeStyle = 'rgba(0,0,0,.85)';
+  vctx.stroke(path);
+  vctx.strokeStyle = 'rgba(255,255,255,.95)';
+  vctx.lineDashOffset = -antsPhase * u + 5 * u;
+  vctx.stroke(path);
+  vctx.restore();
+}
+function pointInSel(p) {
+  if (!pixSelActive()) return false;
+  return vctx.isPointInPath(selPath(pixSel.pts, pixFloat ? pixFloat.dx : 0, pixFloat ? pixFloat.dy : 0), p.x, p.y);
+}
+/* Lift the selected pixels onto their own canvas and clear the hole they
+   leave, so dragging shows what a move will actually look like. */
+function liftPixels() {
+  const b = selBounds(pixSel.pts);
+  const cv = makeCanvas(b.w, b.h, true), c = cv.getContext('2d');
+  c.save();
+  c.translate(-b.x, -b.y);
+  c.clip(selPath(pixSel.pts));
+  c.drawImage(L().cv, 0, 0);
+  c.restore();
+  const lc = fctx();
+  lc.save();
+  lc.clip(selPath(pixSel.pts));
+  lc.clearRect(0, 0, W, H);
+  lc.restore();
+  pixFloat = { cv, x: b.x, y: b.y, dx: 0, dy: 0 };
+}
+function dropPixels() {
+  if (!pixFloat) return;
+  const c = fctx();
+  c.save();
+  c.globalCompositeOperation = 'source-over';
+  c.globalAlpha = 1;
+  c.drawImage(pixFloat.cv, pixFloat.x + pixFloat.dx, pixFloat.y + pixFloat.dy);
+  c.restore();
+  if (pixFloat.dx || pixFloat.dy) {
+    pixSel.pts = pixSel.pts.map(q => ({ x: q.x + pixFloat.dx, y: q.y + pixFloat.dy }));
+  }
+  pixFloat = null;
+  commit();
+}
+function pixDelete() {
+  if (!pixSelActive()) return;
+  pushHistory();
+  const c = fctx();
+  c.save();
+  c.clip(selPath(pixSel.pts));
+  c.clearRect(0, 0, W, H);
+  c.restore();
+  commit();
+  toast('Cleared the selected pixels.');
+}
+function pixFill() {
+  if (!pixSelActive()) return;
+  pushHistory();
+  const c = fctx();
+  c.save();
+  c.clip(selPath(pixSel.pts));
+  paintStyle(c);
+  c.globalCompositeOperation = 'source-over';
+  c.fillRect(0, 0, W, H);
+  c.restore();
+  commit();
+}
+/* The pixels become an image object, which is what gives them scaling,
+   rotation, opacity and the copy-to-other-frames buttons for free. */
+function pixToObject(cutFromLayer) {
+  if (!pixSelActive()) return;
+  const b = selBounds(pixSel.pts);
+  const cv = makeCanvas(b.w, b.h, true), c = cv.getContext('2d');
+  c.save();
+  c.translate(-b.x, -b.y);
+  c.clip(selPath(pixSel.pts));
+  c.drawImage(L().cv, 0, 0);
+  c.restore();
+  const src = cv.toDataURL('image/png');
+  const img = new Image();
+  const finish = () => {
+    pushHistory();
+    if (cutFromLayer) {
+      const lc = fctx();
+      lc.save();
+      lc.clip(selPath(pixSel.pts));
+      lc.clearRect(0, 0, W, H);
+      lc.restore();
+    }
+    const o = {
+      id: nextObjId(), type: 'image', kind: 'image', src, img,
+      x: b.x + b.w / 2, y: b.y + b.h / 2, rot: 0, alpha: 1,
+      w: b.w, h: b.h, color: '#ffffff', mode: 'fill', lw: 1
+    };
+    L().objs.push(o);
+    sel = L().objs.length - 1;
+    setPixSel(null);
+    setTool('select');
+    dirty = true;
+    commit(); syncSelPanel();
+    toast('Lifted to an object — drag, resize, rotate, or send it to other frames.', 'good');
+  };
+  img.onload = finish;
+  img.onerror = () => toast('Those pixels could not be lifted.', 'bad');
+  img.src = src;
+}
+function pixCopy() {
+  if (!pixSelActive()) return;
+  const b = selBounds(pixSel.pts);
+  const cv = makeCanvas(b.w, b.h, true), c = cv.getContext('2d');
+  c.save();
+  c.translate(-b.x, -b.y);
+  c.clip(selPath(pixSel.pts));
+  c.drawImage(L().cv, 0, 0);
+  c.restore();
+  const src = cv.toDataURL('image/png');
+  const img = new Image();
+  img.onload = () => {
+    objClip = {
+      id: 0, type: 'image', kind: 'image', src, img,
+      x: b.x + b.w / 2, y: b.y + b.h / 2, rot: 0, alpha: 1,
+      w: b.w, h: b.h, color: '#ffffff', mode: 'fill', lw: 1
+    };
+    toast('Copied ' + b.w + ' \u00d7 ' + b.h + ' px. Ctrl+V pastes it, on this frame or any other.');
+  };
+  img.src = src;
+}
+function pixCrop() {
+  if (!pixSelActive()) return;
+  const b = selBounds(pixSel.pts);
+  setTool('crop');
+  setCropRect(b);
+  toast('Crop set to the selection. Press Apply to confirm.');
+}
+$('pix-none').onclick = () => { dropPixels(); setPixSel(null); };
+$('pix-del').onclick = pixDelete;
+$('pix-fill').onclick = pixFill;
+$('pix-object').onclick = () => pixToObject(true);
+$('pix-copy').onclick = pixCopy;
+$('pix-crop').onclick = pixCrop;
+
+/* ==================================================== playback & presets */
+let playSpeed = 1;
+function applyFPS(fps) {
+  if (!fps) return;
+  const d = Math.max(20, Math.round(1000 / fps));
+  pushStruct();
+  frames.forEach(f => f.delay = d);
+  dirty = true;
+  refreshAll();
+  toast('Every frame set to ' + d + 'ms — ' + fps + ' fps.', 'good');
+}
+const BG_PRESETS = ['#ffffff', '#000000', '#0f1115', '#f5f0e6', '#1b2333', '#2ecc71', '#ff4d6d',
+                    '#4c8dff', '#ffd166', '#8b5cf6', '#f8f9fa', '#212529', '#0b3d2e', '#ffe8f0'];
+function renderBGPresets() {
+  const host = $('bg-presets');
+  host.innerHTML = '';
+  BG_PRESETS.forEach(hex => {
+    const b = document.createElement('button');
+    b.style.background = hex;
+    b.title = hex;
+    b.onclick = () => {
+      $('bg-color').value = hex;
+      $('bg-transparent').checked = false;
+      repaint();
+      frames.forEach((_, i) => drawThumb(i));
+    };
+    host.appendChild(b);
+  });
+}
+
+/* ========================================================= video → frames */
+/* Seek, draw, repeat. Seeking rather than playing means the sampling is
+   exact and a slow machine cannot drop frames on us. */
+async function importVideo(file) {
+  const url = URL.createObjectURL(file);
+  const v = document.createElement('video');
+  v.muted = true; v.playsInline = true; v.preload = 'auto';
+  try {
+    await new Promise((res, rej) => {
+      v.onloadedmetadata = res;
+      v.onerror = () => rej(new Error('that file could not be read as video'));
+      v.src = url;
+    });
+    const dur = v.duration;
+    if (!isFinite(dur) || dur <= 0) throw new Error('the video has no readable duration');
+    const fps = 12;                       // a sane default for hand-drawn-looking output
+    const want = Math.min(120, Math.max(2, Math.round(dur * fps)));
+    const step = dur / want;
+    progress(.02, 'Sampling video…');
+    stopPlay();
+    pushStruct();
+    const seekTo = t => new Promise(res => { v.onseeked = res; v.currentTime = Math.min(t, dur - 0.001); });
+    const made = [];
+    for (let i = 0; i < want; i++) {
+      await seekTo(i * step);
+      const f = newFrame(Math.max(20, Math.round(step * 1000)));
+      const c = f.layers[0].cv.getContext('2d');
+      const s = Math.min(W / v.videoWidth, H / v.videoHeight);
+      c.drawImage(v, (W - v.videoWidth * s) / 2, (H - v.videoHeight * s) / 2, v.videoWidth * s, v.videoHeight * s);
+      made.push(f);
+      progress(.02 + .95 * (i + 1) / want, 'Sampling frame ' + (i + 1) + '/' + want + '…');
+      await maybeYield();
+    }
+    frames.push(...made);
+    cur = frames.length - made.length;
+    sel = -1; dirty = true;
+    renderTimeline(); refreshAll();
+    progress(-1);
+    toast('Sampled ' + made.length + ' frames from ' + file.name + ' at about ' + fps + ' fps.', 'good');
+  } catch (err) {
+    progress(-1);
+    toast('Video import failed: ' + err.message, 'bad');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/* ================================================================= rails */
+/* Focus mode remembers what was open before it, so leaving it puts the
+   workspace back exactly as it was rather than showing everything. */
+let railState = { left: true, right: true, timeline: true, focusPrev: null };
+function applyRails() {
+  const w = document.querySelector('.wrap');
+  w.classList.toggle('no-left', !railState.left);
+  w.classList.toggle('no-right', !railState.right);
+  w.classList.toggle('no-timeline', !railState.timeline);
+  $('btn-rail-l').classList.toggle('on', railState.left);
+  $('btn-rail-r').classList.toggle('on', railState.right);
+  const focused = !railState.left && !railState.right && !railState.timeline;
+  $('btn-focus').classList.toggle('on', focused);
+  try { localStorage.setItem('fs-rails', JSON.stringify({ l: railState.left, r: railState.right, t: railState.timeline })); } catch (_) {}
+  if (zoomIsFit) setTimeout(zoomFit, 30);       // after the grid has re-solved
+  else applyZoom();
+}
+function toggleRail(which) {
+  railState[which] = !railState[which];
+  railState.focusPrev = null;
+  applyRails();
+}
+function toggleFocus() {
+  const focused = !railState.left && !railState.right && !railState.timeline;
+  if (focused && railState.focusPrev) {
+    Object.assign(railState, railState.focusPrev, { focusPrev: null });
+  } else if (focused) {
+    Object.assign(railState, { left: true, right: true, timeline: true, focusPrev: null });
+  } else {
+    railState.focusPrev = { left: railState.left, right: railState.right, timeline: railState.timeline };
+    Object.assign(railState, { left: false, right: false, timeline: false });
+  }
+  applyRails();
+  flash(railState.left ? 'Panels back.' : 'Focus mode — press Tab to bring the panels back.');
+}
+$('btn-rail-l').onclick = () => toggleRail('left');
+$('btn-rail-r').onclick = () => toggleRail('right');
+$('btn-focus').onclick = toggleFocus;
+try {
+  const r = JSON.parse(localStorage.getItem('fs-rails') || 'null');
+  if (r) Object.assign(railState, { left: r.l !== false, right: r.r !== false, timeline: r.t !== false });
+} catch (_) {}
+
+/* =============================================================== welcome */
+/* First thing anyone sees. It also carries the resume offer, so a returning
+   visitor gets one clear choice instead of a bar sliding in behind the
+   editor they are already looking at. */
+const WELCOME_SIZES = [
+  ['500 × 500', 500, 500], ['320 × 320', 320, 320], ['640 × 640', 640, 640],
+  ['640 × 360', 640, 360], ['1080 × 1080', 1080, 1080], ['1080 × 1920', 1080, 1920],
+  ['800 × 600', 800, 600], ['480 × 600', 480, 600]
+];
+let welcomeDoc = null;
+function welcomeSkipped() {
+  try { return localStorage.getItem('fs-skip-welcome') === '1'; } catch (_) { return false; }
+}
+function closeWelcome() {
+  $('welcome').classList.remove('open');
+  if (zoomIsFit) zoomFit();
+}
+/* Returns true when it took responsibility for the restore offer. */
+function showWelcome(doc) {
+  welcomeDoc = doc;
+  if (welcomeSkipped()) return false;
+  openWelcome();
+  return !!doc;
+}
+function openWelcome() {
+  const doc = welcomeDoc;
+  if (doc) {
+    const when = new Date(doc.at);
+    $('w-resume').style.display = '';
+    $('w-resume-sub').textContent = doc.frames + (doc.frames === 1 ? ' frame' : ' frames') +
+      ', saved ' + when.toLocaleString();
+  } else {
+    $('w-resume').style.display = 'none';
+  }
+  $('w-skip').checked = welcomeSkipped();
+  $('welcome').classList.add('open');
+}
+function newProject(w, h) {
+  frames.length = 0;
+  frames.push(newFrame());
+  cur = 0; sel = -1;
+  undoStack.length = redoStack.length = 0;
+  updateHistoryButtons();
+  if (w && h && (w !== W || h !== H)) resize(w, h, false);
+  else { renderTimeline(); refreshAll(); }
+  dirty = false;
+  closeWelcome();
+  if (zoomIsFit) zoomFit();
+}
+$('w-new').onclick = () => newProject();
+$('w-import').onclick = () => { closeWelcome(); $('file-img').click(); };
+$('w-open').onclick = () => { closeWelcome(); $('file-proj').click(); };
+$('w-close').onclick = closeWelcome;
+$('w-resume').onclick = () => {
+  closeWelcome();
+  if (welcomeDoc) applyProject(welcomeDoc.data, () => toast('Restored ' + frames.length + ' frames from autosave.', 'good'));
+};
+$('w-skip').onchange = e => { try { localStorage.setItem('fs-skip-welcome', e.target.checked ? '1' : '0'); } catch (_) {} };
+$('brand').onclick = e => { e.preventDefault(); openWelcome(); };
+(() => {
+  const host = $('w-sizes');
+  const lead = document.createElement('span');
+  lead.style.cssText = 'align-self:center;color:var(--muted);font-size:11.5px;margin-right:2px';
+  lead.textContent = 'or start at';
+  host.appendChild(lead);
+  WELCOME_SIZES.forEach(([label, w, h]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = () => newProject(w, h);
+    host.appendChild(b);
+  });
+})();
+
 /* ============================================== timeline zoom & status bar */
 let tlSize = 84;
 function setTimelineSize(px) {
@@ -4089,6 +4736,12 @@ const COMMANDS = [
   { g: 'Tool', n: 'Smudge', k: 'S', r: () => setTool('smudge') },
   { g: 'Tool', n: 'Colour picker', k: 'I', r: () => setTool('eyedrop') },
   { g: 'Tool', n: 'Crop', k: 'C', r: () => setTool('crop') },
+  { g: 'Tool', n: 'Marquee — select pixels', k: 'M', r: () => setTool('marquee') },
+  { g: 'Tool', n: 'Lasso — select pixels freehand', k: 'Q', r: () => setTool('lasso') },
+  { g: 'Edit', n: 'Lift the selected pixels to an object', r: () => pixToObject(true) },
+  { g: 'Edit', n: 'Copy the selected pixels', r: pixCopy },
+  { g: 'Edit', n: 'Fill the pixel selection', r: pixFill },
+  { g: 'Edit', n: 'Deselect pixels', r: () => { dropPixels(); setPixSel(null); } },
   { g: 'Symmetry', n: 'Symmetry off', r: () => setSymmetry('off') },
   { g: 'Symmetry', n: 'Mirror horizontally', r: () => setSymmetry('x') },
   { g: 'Symmetry', n: 'Mirror vertically', r: () => setSymmetry('y') },
@@ -4126,6 +4779,10 @@ const COMMANDS = [
   { g: 'View', n: 'Toggle snap to grid', r: () => { $('grid-snap').checked = !$('grid-snap').checked; toast('Snap to grid ' + ($('grid-snap').checked ? 'on.' : 'off.')); } },
   { g: 'View', n: 'Fit canvas to the window', k: '0', r: () => { zoomIsFit = true; zoomFit(); } },
   { g: 'View', n: 'Actual size', k: '1', r: () => { zoomIsFit = false; setZoom(1); } },
+  { g: 'View', n: 'Focus mode — hide the panels', k: 'Tab', r: toggleFocus },
+  { g: 'View', n: 'Show or hide the tool rail', r: () => toggleRail('left') },
+  { g: 'View', n: 'Show or hide the properties rail', r: () => toggleRail('right') },
+  { g: 'View', n: 'Show or hide the timeline', r: () => toggleRail('timeline') },
   { g: 'View', n: 'Collapse every panel section', r: () => setAllSections(false) },
   { g: 'View', n: 'Expand every panel section', r: () => setAllSections(true) },
   { g: 'View', n: 'Switch light / dark theme', r: () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light') },
@@ -4137,7 +4794,10 @@ const COMMANDS = [
   { g: 'File', n: 'Export animated PNG (APNG)', r: exportAPNG },
   { g: 'File', n: 'Save project', k: 'Ctrl+S', r: saveProject },
   { g: 'File', n: 'Open project…', r: () => $('file-proj').click() },
+  { g: 'File', n: 'New project', r: () => newProject() },
+  { g: 'File', n: 'Show the welcome screen', r: openWelcome },
   { g: 'File', n: 'Import GIF or images…', r: () => $('file-img').click() },
+  { g: 'File', n: 'Import a video as frames…', r: () => $('file-video').click() },
   { g: 'File', n: 'Load a reference image…', r: () => $('file-ref').click() },
   { g: 'File', n: 'Insert an image into this frame…', r: () => $('file-place').click() },
   { g: 'Frame', n: 'Copy selection to every frame', r: () => copySelToFrames('all') },
@@ -4244,6 +4904,17 @@ $('fx-modal').onclick = e => { if (e.target.id === 'fx-modal') fxClose(); };
 $('btn-place-img').onclick = () => $('file-place').click();
 $('file-place').onchange = e => { insertImages(e.target.files); e.target.value = ''; };
 $('btn-frame-copy').onclick = copyFrameToAll;
+$('fps-preset').onchange = e => { applyFPS(+e.target.value); e.target.value = ''; };
+$('play-speed').onchange = e => { playSpeed = +e.target.value || 1; if (playing) { stopPlay(); startPlay(); } };
+$('btn-video').onclick = () => $('file-video').click();
+$('file-video').onchange = e => { if (e.target.files[0]) importVideo(e.target.files[0]); e.target.value = ''; };
+$('grad-on').onchange = e => editSel(o => o.grad = e.target.checked);
+$('color2').oninput = e => editSel(o => o.color2 = e.target.value, 'color2');
+$('grad-angle').onchange = e => editSel(o => o.gradAngle = e.target.value);
+$('txt-stroke').oninput = e => editSel(o => { if (o.type === 'text') o.stroke = +e.target.value || 0; }, 'tstroke');
+$('txt-stroke-color').oninput = e => editSel(o => { if (o.type === 'text') o.strokeColor = e.target.value; }, 'tstrokec');
+$('txt-shadow').oninput = e => editSel(o => { if (o.type === 'text') o.shadow = +e.target.value || 0; }, 'tshadow');
+$('txt-shadow-color').oninput = e => editSel(o => { if (o.type === 'text') o.shadowColor = e.target.value; }, 'tshadowc');
 $('lay-share').onclick = () => setLayerShared(!L().shared);
 $('sel-tonext').onclick = () => copySelToFrames('next');
 $('sel-toall').onclick = () => copySelToFrames('all');
@@ -4275,10 +4946,13 @@ $('btn-apng').onclick = guard(exportAPNG, 'APNG export');
 /* Shortcuts that must work even while a panel field has focus. */
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
+  const inField = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '');
+  if (e.key === 'Tab' && !inField && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); toggleFocus(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'k') { e.preventDefault(); $('cmdk').classList.contains('open') ? cmdClose() : cmdOpen(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 's') { e.preventDefault(); saveProject(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'e') { e.preventDefault(); $('btn-export').click(); return; }
   if (e.key === 'Escape') {
+    if ($('welcome').classList.contains('open')) { closeWelcome(); return; }
     if ($('cmdk').classList.contains('open')) { cmdClose(); return; }
     if ($('fx-modal').classList.contains('open')) { fxClose(); return; }
   }
@@ -4289,8 +4963,10 @@ frames.push(newFrame());
 try { setTheme(localStorage.getItem('fs-theme') || 'dark'); } catch (_) { setTheme('dark'); }
 renderSwatches();
 renderRecents();
+renderBGPresets();
 initSections();
 try { setTimelineSize(+localStorage.getItem('fs-tlsize') || 84); } catch (_) { setTimelineSize(84); }
+applyRails();
 renderFonts('');
 renderTimeline();
 updateHistoryButtons();
