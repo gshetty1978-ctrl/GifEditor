@@ -121,6 +121,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
    The columns collapse to zero and the grid re-solves, which hands every
    pixel they were using to the viewport. */
 @media(min-width:1101px){
+  /* Pin each panel to its own column. Without this, hiding a rail removes it
+     from the flow and the remaining panels auto-place one column to the left -
+     the canvas lands in the collapsed 0px track and disappears. */
+  .wrap > .panel:nth-of-type(1){grid-column:1;grid-row:1}
+  .wrap > .panel:nth-of-type(2){grid-column:2;grid-row:1}
+  .wrap > .panel:nth-of-type(3){grid-column:3;grid-row:1}
   .wrap.no-left{grid-template-columns:0 minmax(0,1fr) 230px}
   .wrap.no-right{grid-template-columns:270px minmax(0,1fr) 0}
   .wrap.no-left.no-right{grid-template-columns:0 minmax(0,1fr) 0}
