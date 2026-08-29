@@ -117,6 +117,32 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-size:12px;line-height:1;cursor:pointer;border-radius:4px;flex:0 0 auto}
 .layer-row .mini:hover{background:#39415a}
 .layer-row .off{opacity:.38}
+/* ---- collapsible sections ----
+   Every panel section is now a disclosure: the h3 is its handle, and the
+   open/closed state is remembered per section so the cockpit you set up
+   survives a reload. */
+.sec > h3{cursor:pointer;user-select:none;display:flex;align-items:center;gap:7px;
+  margin:0 0 8px;padding:2px 0;transition:color .12s}
+.sec > h3:hover{color:var(--text)}
+.sec > h3::before{content:'';flex:0 0 auto;width:0;height:0;
+  border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;
+  transform:rotate(90deg);transition:transform .16s ease}
+.sec.collapsed > h3{margin-bottom:0}
+.sec.collapsed > h3::before{transform:rotate(0deg)}
+.sec.collapsed > *:not(h3){display:none !important}
+.sec > h4{margin:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--muted);font-weight:700}
+.sec > h4:first-of-type{margin-top:0}
+.sec > h3:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ---- keyboard hint on a tool button ---- */
+button .k{margin-left:auto;font-size:9.5px;line-height:1;padding:2px 4px;border-radius:3px;
+  background:rgba(255,255,255,.09);color:var(--muted);font-family:ui-monospace,Consolas,monospace;
+  letter-spacing:.02em}
+button.on .k{background:rgba(0,0,0,.22);color:rgba(255,255,255,.92)}
+#tools .grid2 button,#tools .grid4 button{justify-content:flex-start;gap:5px;padding:8px 6px 8px 8px;font-size:13px}
+html[data-theme="light"] button .k{background:rgba(0,0,0,.07)}
+
 /* ---- light theme: the same tokens, re-pointed ---- */
 html[data-theme="light"]{
   --bg:#eef1f6; --panel:#ffffff; --panel2:#eff2f7; --line:#d3dae5;
@@ -246,37 +272,38 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
   <!-- LEFT -->
   <div class="panel">
     <div class="sec" id="tools">
-      <h3>Draw</h3>
+      <h3>🎨 Tools</h3>
+      <h4>Draw</h4>
       <div class="grid2">
-        <button data-tool="brush" class="on" title="Brush — B">🖌️ Brush</button>
-        <button data-tool="eraser" title="Eraser — E">🧽 Eraser</button>
-        <button data-tool="line" title="Line — L">📏 Line</button>
-        <button data-tool="rect" title="Rectangle — R">▭ Rect</button>
-        <button data-tool="ellipse" title="Ellipse — O">◯ Ellipse</button>
-        <button data-tool="fill" title="Flood fill — G">🪣 Fill</button>
-        <button data-tool="text" title="Text — T">🔤 Text</button>
-        <button data-tool="eyedrop" title="Colour picker — I">💧 Pick</button>
-        <button data-tool="spray" title="Airbrush — A">💨 Spray</button>
-        <button data-tool="smudge" title="Smudge — S">👉 Smudge</button>
+        <button data-tool="brush" class="on" title="Brush — B">🖌️ Brush<span class="k">B</span></button>
+        <button data-tool="eraser" title="Eraser — E">🧽 Eraser<span class="k">E</span></button>
+        <button data-tool="line" title="Line — L">📏 Line<span class="k">L</span></button>
+        <button data-tool="rect" title="Rectangle — R">▭ Rect<span class="k">R</span></button>
+        <button data-tool="ellipse" title="Ellipse — O">◯ Ellipse<span class="k">O</span></button>
+        <button data-tool="fill" title="Flood fill — G">🪣 Fill<span class="k">G</span></button>
+        <button data-tool="text" title="Text — T">🔤 Text<span class="k">T</span></button>
+        <button data-tool="eyedrop" title="Colour picker — I">💧 Pick<span class="k">I</span></button>
+        <button data-tool="spray" title="Airbrush — A">💨 Spray<span class="k">A</span></button>
+        <button data-tool="smudge" title="Smudge — S">👉 Smudge<span class="k">S</span></button>
       </div>
       <label class="row" style="margin-top:10px">Smoothing <span id="smooth-val" style="color:var(--text)">0%</span></label>
       <input type="range" id="smooth" min="0" max="90" value="0" title="Steadies a shaky hand on brush and eraser strokes">
       <label class="row">Fill tolerance <span id="tol-val" style="color:var(--text)">24</span></label>
       <input type="range" id="tol" min="0" max="160" value="24" title="How different a neighbouring pixel may be and still be filled">
-      <h3>Edit</h3>
+      <h4>Edit</h4>
       <div class="grid2">
-        <button data-tool="crop" title="Crop the canvas to a region — C">✂ Crop</button>
-        <button data-tool="select" title="Select, move, resize and rotate — V">🖱️ Select</button>
+        <button data-tool="crop" title="Crop the canvas to a region — C">✂ Crop<span class="k">C</span></button>
+        <button data-tool="select" title="Select, move, resize and rotate — V">🖱️ Select<span class="k">V</span></button>
         <button id="btn-flatten" title="Bake shapes and text into pixels">🔒 Flatten</button>
         <button id="btn-place-img" title="Drop a picture into this frame as a movable object">🖼️ Insert image</button>
         <button id="btn-frame-copy" title="Copy everything on this frame's layer to other frames">⧉ Frame to…</button>
       </div>
-      <h3>View</h3>
+      <h4>View</h4>
       <div class="grid2">
-        <button data-tool="pan" title="Pan the canvas — H">✋ Pan</button>
+        <button data-tool="pan" title="Pan the canvas — H">✋ Pan<span class="k">H</span></button>
         <button id="btn-onion" title="Show neighbouring frames as a ghost">🧅 Onion</button>
       </div>
-      <h3>Symmetry</h3>
+      <h4>Symmetry</h4>
       <div class="grid4">
         <button id="sym-off" class="on" title="No mirroring">∅</button>
         <button id="sym-x" title="Mirror left ↔ right">⇔</button>
@@ -287,7 +314,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     </div>
 
     <div class="sec">
-      <h3>Stamps <span style="text-transform:none;font-weight:400">(click or drag)</span></h3>
+      <h3>⭐ Stamps <span style="text-transform:none;font-weight:400">(click or drag)</span></h3>
       <div class="grid4" id="stamps">
         <button data-shape="circle" title="Circle">⭕</button>
         <button data-shape="square" title="Square">⬛</button>
@@ -329,7 +356,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     </div>
 
     <div class="sec">
-      <h3>Style</h3>
+      <h3>⚙️ Properties</h3>
       <label class="row">Color <input type="color" id="color" value="#4c8dff"></label>
       <div class="swatches" id="swatches"></div>
       <div class="recents" id="recents" title="Colours you have used recently"></div>
@@ -341,10 +368,11 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       </div>
       <label class="row" style="margin-top:10px">Opacity <span id="alpha-val" style="color:var(--text)">100%</span></label>
       <input type="range" id="alpha" min="5" max="100" value="100">
+      <label class="row" style="margin-top:8px">Pen pressure <input type="checkbox" id="pressure-on" checked title="A stylus varies stroke width and opacity with how hard you press. Ignored by a mouse."></label>
     </div>
 
     <div class="sec" id="text-panel" style="display:none">
-      <h3>Text</h3>
+      <h3>🔤 Text</h3>
       <textarea id="text-input" placeholder="Type here… (Enter = new line)">Hello World</textarea>
       <label class="row" style="margin-top:8px">Font size <input type="number" id="font-size" value="48" min="6" max="400" style="width:78px"></label>
       <div class="grid2">
@@ -411,7 +439,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
   <!-- RIGHT -->
   <div class="panel">
     <div class="sec">
-      <h3>Canvas</h3>
+      <h3>🖼️ Canvas</h3>
       <select id="canvas-size">
         <option value="500x500">500 × 500</option>
         <option value="320x320">320 × 320</option>
@@ -434,7 +462,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <label class="row">Snap to grid <input type="checkbox" id="grid-snap"></label>
     </div>
     <div class="sec">
-      <h3>Transform</h3>
+      <h3>🔄 Transform</h3>
       <div class="grid2">
         <button id="tr-fliph" title="Mirror left ↔ right">⇔ Flip H</button>
         <button id="tr-flipv" title="Mirror top ↕ bottom">⇕ Flip V</button>
@@ -450,7 +478,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <p class="note">Flipping bakes that layer's shapes and text into pixels first. Rotating 90° turns the whole project and swaps the canvas dimensions.</p>
     </div>
     <div class="sec">
-      <h3>Layers</h3>
+      <h3>🧱 Layers</h3>
       <div class="layer-list" id="layer-list"></div>
       <div class="grid4" style="margin-top:6px">
         <button id="lay-add" title="New layer above">&#65291;</button>
@@ -462,6 +490,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <button id="lay-merge" title="Merge this layer into the one below">&#10515; Merge down</button>
         <button id="lay-del" class="danger" title="Delete this layer">&#10005; Delete</button>
       </div>
+      <button id="lay-share" style="width:100%;margin-top:6px" title="One canvas shown on every frame - ideal for a background that never moves">&#128279; Share across frames</button>
       <input type="text" id="lay-name" placeholder="Layer name" style="margin-top:6px">
       <label class="row" style="margin-top:6px">Blend <select id="lay-blend" style="width:124px">
         <option value="source-over">Normal</option>
@@ -487,7 +516,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     </div>
 
     <div class="sec">
-      <h3>Reference image</h3>
+      <h3>📎 Reference image</h3>
       <button id="ref-load" style="width:100%">&#128206; Load reference&#8230;</button>
       <div id="ref-controls" style="display:none">
         <label class="row">Opacity <span id="ref-alpha-val" style="color:var(--text)">40%</span></label>
@@ -511,7 +540,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       </div>
     </div>
     <div class="sec">
-      <h3>Export</h3>
+      <h3>📤 Export</h3>
       <label class="row">Background <input type="color" id="bg-color" value="#ffffff"></label>
       <label class="row">Transparent <input type="checkbox" id="bg-transparent"></label>
       <label class="row">Loop forever <input type="checkbox" id="loop-forever" checked></label>
@@ -535,10 +564,11 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <button id="btn-zip" title="Save every frame as a separate PNG">📦 All frames</button>
         <button id="btn-webm" title="Record the animation as a true-colour WebM video">🎥 WebM video</button>
       </div>
+      <button id="btn-apng" style="width:100%;margin-top:6px" title="Animated PNG — lossless, every colour, real transparency">🌈 Animated PNG</button>
       <p class="note">GIF caps out at 256 colours; WebM keeps every one, and PNG frames are lossless.</p>
     </div>
     <div class="sec">
-      <h3>Shortcuts</h3>
+      <h3>⌨️ Shortcuts</h3>
       <div class="keys">
         <kbd>Ctrl</kbd>+<kbd>K</kbd> command palette — everything, searchable<br>
         <kbd>V</kbd> select · <kbd>B</kbd> brush · <kbd>E</kbd> eraser · <kbd>T</kbd> text<br>
@@ -654,7 +684,8 @@ function newLayer(name) {
   return {
     name: name || 'Layer ' + (++layerSeq),
     cv: makeCanvas(W, H, true), objs: [],
-    visible: true, locked: false, opacity: 1, blend: 'source-over'
+    visible: true, locked: false, opacity: 1, blend: 'source-over',
+    shared: false, sid: 0
   };
 }
 function newFrame(delay) {
@@ -673,6 +704,13 @@ function cloneLayer(l, keepIds) {
   c.visible = l.visible; c.locked = l.locked; c.opacity = l.opacity;
   c.blend = l.blend || 'source-over';
   return c;
+}
+/* A shared layer is one canvas that every frame points at, so copying a frame
+   must pass the reference along rather than duplicating it - duplicating is
+   exactly what sharing exists to avoid. */
+let shareSeq = 0;
+function copyLayerForFrame(l, keepIds) {
+  return l.shared ? l : cloneLayer(l, keepIds);
 }
 
 /* ------------------------------------------------------------ object model */
@@ -1173,7 +1211,7 @@ function duplicateFrame() {
   pushStruct();
   const f = newFrame(F().delay);
   // keep object ids so the copy can be tweened against its source
-  f.layers = F().layers.map(l => cloneLayer(l, true));
+  f.layers = F().layers.map(l => copyLayerForFrame(l, true));
   f.active = F().active;
   frames.splice(cur + 1, 0, f);
   cur++; sel = -1; dirty = true;
@@ -1230,7 +1268,8 @@ function renderLayers() {
     lock.onclick = e => { e.stopPropagation(); pushLayerStruct(); l.locked = !l.locked; refreshAll(); };
     const nm = document.createElement('span');
     nm.className = 'nm' + (l.visible ? '' : ' off');
-    nm.textContent = l.name;
+    nm.textContent = (l.shared ? '\u{1F517} ' : '') + l.name;
+    if (l.shared) nm.title = 'Shared with every frame';
     row.append(eye, lock, nm);
     host.appendChild(row);
   }
@@ -1239,6 +1278,10 @@ function renderLayers() {
   $('lay-blend').value = l.blend || 'source-over';
   $('lay-op').value = Math.round(l.opacity * 100);
   $('lay-op-val').textContent = Math.round(l.opacity * 100) + '%';
+  const sb = $('lay-share');
+  sb.classList.toggle('on', !!l.shared);
+  sb.innerHTML = l.shared ? '&#128279; Shared with every frame' : '&#128279; Share across frames';
+  sb.disabled = frames.length < 2;
   $('lay-del').disabled = f.layers.length <= 1;
   $('lay-merge').disabled = f.active === 0;
   $('lay-up').disabled = f.active >= f.layers.length - 1;
@@ -1264,6 +1307,19 @@ function duplicateLayer() {
 function deleteLayer() {
   const f = F();
   if (f.layers.length <= 1) { toast('A frame needs at least one layer.', 'bad'); return; }
+  const victim = L();
+  if (victim.shared) {
+    if (frames.some(fr => fr.layers.length <= 1 && fr.layers[0] === victim)) {
+      toast('That shared layer is the only layer on another frame. Unshare it first.', 'bad');
+      return;
+    }
+    stopPlay(); pushStruct();
+    frames.forEach(fr => { fr.layers = fr.layers.filter(l => l !== victim); fr.active = Math.min(fr.active, fr.layers.length - 1); });
+    sel = -1; dirty = true;
+    renderTimeline(); refreshAll();
+    toast('Shared layer removed from every frame.');
+    return;
+  }
   stopPlay(); pushLayerStruct();
   f.layers.splice(f.active, 1);
   f.active = Math.max(0, f.active - 1);
@@ -1472,7 +1528,9 @@ function setTool(t, sh) {
   if (t !== 'select') sel = -1;
   if (t !== 'crop') setCropRect(null);
   if (ref && ref.move) { ref.move = false; $('ref-move').classList.remove('on'); }
-  $('text-panel').style.display = (t === 'text' || (t === 'select' && selObj() && selObj().type === 'text')) ? '' : 'none';
+  const wantText = (t === 'text' || (t === 'select' && selObj() && selObj().type === 'text'));
+  $('text-panel').style.display = wantText ? '' : 'none';
+  if (wantText) revealSection($('text-panel'));
   const msgs = {
     select: 'Select — click a shape or text to move, resize or rotate it.',
     brush: 'Brush — draw freely.', eraser: 'Eraser — erases pixels only, not shapes.',
@@ -1497,6 +1555,7 @@ function setTool(t, sh) {
 function syncSelPanel() {
   const o = selObj();
   $('sel-panel').style.display = o ? '' : 'none';
+  if (o) revealSection($('sel-panel'));
   if (!o) { if (tool !== 'text') $('text-panel').style.display = 'none'; return; }
   $('sel-kind').textContent = o.type === 'text' ? '— text' : '— ' + o.kind;
   syncing = true;
@@ -1569,6 +1628,7 @@ function newObjBase(p) {
 view.addEventListener('pointerdown', e => {
   if (playing) stopPlay();
   try { view.setPointerCapture(e.pointerId); } catch (_) {}
+  readPressure(e);
   const p = pos(e);
   shiftKey = e.shiftKey;
   moved = false;
@@ -1676,6 +1736,7 @@ view.addEventListener('pointerdown', e => {
 });
 
 view.addEventListener('pointermove', e => {
+  readPressure(e);
   const p = pos(e);
   shiftKey = e.shiftKey;
 
@@ -1854,14 +1915,31 @@ function withSym(c, fn) {
   }
   c.setTransform(1, 0, 0, 1, 0, 0);
 }
+/* A stylus reports how hard it is pressed; a mouse reports a constant, so
+   only a pen gets to modulate the stroke. Width carries most of the feel,
+   opacity a little, which is roughly how a real brush behaves. */
+let penPressure = 1, penActive = false;
+function readPressure(e) {
+  penActive = e.pointerType === 'pen';
+  penPressure = penActive ? Math.max(0.02, e.pressure || 0.5) : 1;
+}
+function pressureScale() {
+  return (penActive && $('pressure-on').checked) ? 0.25 + 0.75 * penPressure : 1;
+}
 function strokeSeg(c, a, b) {
+  const k = pressureScale();
+  const baseW = +$('size').value, baseA = +$('alpha').value / 100;
+  if (k !== 1) {
+    c.lineWidth = Math.max(0.5, baseW * k);
+    c.globalAlpha = baseA * (0.55 + 0.45 * penPressure);
+  }
   withSym(c, cc => { cc.beginPath(); cc.moveTo(a.x, a.y); cc.lineTo(b.x, b.y); cc.stroke(); });
 }
 /* Airbrush: a scatter of dots, denser at the centre. The offsets are drawn
    once and replayed under each mirror, so a symmetric spray really is
    symmetric rather than four different clouds. */
 function sprayAt(c, p, r) {
-  const n = Math.max(6, Math.round(r * 1.1));
+  const n = Math.max(3, Math.round(r * 1.1 * pressureScale()));
   const pts = [];
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r;
@@ -2613,7 +2691,8 @@ function projectData() {
       delay: f.delay, active: f.active,
       layers: f.layers.map(l => ({
         name: l.name, visible: l.visible, locked: l.locked, opacity: l.opacity,
-        blend: l.blend || 'source-over', objs: cleanObjs(l.objs), png: l.cv.toDataURL('image/png')
+        blend: l.blend || 'source-over', shared: !!l.shared, sid: l.sid || 0,
+        objs: cleanObjs(l.objs), png: l.cv.toDataURL('image/png')
       }))
     }))
   };
@@ -2660,10 +2739,12 @@ function applyProject(data, done) {
     ? fd
     : { delay: fd.delay, active: 0, layers: [{ name: 'Layer 1', visible: true, locked: false, opacity: 1, objs: fd.objs, png: fd.png }] });
   let pending = shaped.reduce((n, fd) => n + fd.layers.length, 0);
+  const sharedMap = new Map();          // sid -> the one layer every frame reuses
   shaped.forEach((fd, i) => {
     const f = newFrame(fd.delay);
     f.active = fd.active || 0;
     f.layers = fd.layers.map(ld => {
+      if (ld.shared && ld.sid && sharedMap.has(ld.sid)) { ld.__reuse = true; return sharedMap.get(ld.sid); }
       const l = newLayer(ld.name);
       l.visible = ld.visible !== false;
       l.locked = !!ld.locked;
@@ -2671,12 +2752,16 @@ function applyProject(data, done) {
       l.blend = ld.blend || 'source-over';
       l.objs = (Array.isArray(ld.objs) ? ld.objs : []).map(o => Object.assign({ id: nextObjId() }, o));
       hydrateObjs(l.objs);
+      l.shared = !!ld.shared;
+      l.sid = ld.sid || 0;
+      if (l.shared && l.sid) { sharedMap.set(l.sid, l); shareSeq = Math.max(shareSeq, l.sid); }
       return l;
     });
     frames[i] = f;
     fd.layers.forEach((ld, li) => {
       const img = new Image();
       const settle = () => { if (--pending === 0) { cur = 0; sel = -1; renderTimeline(); refreshAll(); if (zoomIsFit) zoomFit(); if (done) done(); } };
+      if (ld.__reuse) { settle(); return; }      // already painted for another frame
       img.onload = () => { f.layers[li].cv.getContext('2d').drawImage(img, 0, 0); settle(); };
       img.onerror = settle;
       img.src = ld.png;
@@ -2741,7 +2826,8 @@ function saveProject() {
       delay: f.delay, active: f.active,
       layers: f.layers.map(l => ({
         name: l.name, visible: l.visible, locked: l.locked, opacity: l.opacity,
-        blend: l.blend || 'source-over', objs: cleanObjs(l.objs), png: l.cv.toDataURL('image/png')
+        blend: l.blend || 'source-over', shared: !!l.shared, sid: l.sid || 0,
+        objs: cleanObjs(l.objs), png: l.cv.toDataURL('image/png')
       }))
     }))
   };
@@ -2766,10 +2852,12 @@ function loadProject(file) {
       ? fd
       : { delay: fd.delay, active: 0, layers: [{ name: 'Layer 1', visible: true, locked: false, opacity: 1, objs: fd.objs, png: fd.png }] });
     let pending = shaped.reduce((n, fd) => n + fd.layers.length, 0);
+    const sharedMap = new Map();
     shaped.forEach((fd, i) => {
       const f = newFrame(fd.delay);
       f.active = fd.active || 0;
       f.layers = fd.layers.map(ld => {
+        if (ld.shared && ld.sid && sharedMap.has(ld.sid)) { ld.__reuse = true; return sharedMap.get(ld.sid); }
         const l = newLayer(ld.name);
         l.visible = ld.visible !== false;
         l.locked = !!ld.locked;
@@ -2777,11 +2865,18 @@ function loadProject(file) {
         l.blend = ld.blend || 'source-over';
         l.objs = (Array.isArray(ld.objs) ? ld.objs : []).map(o => Object.assign({ id: nextObjId() }, o));
         hydrateObjs(l.objs);
+        l.shared = !!ld.shared;
+        l.sid = ld.sid || 0;
+        if (l.shared && l.sid) { sharedMap.set(l.sid, l); shareSeq = Math.max(shareSeq, l.sid); }
         return l;
       });
       frames[i] = f;
       fd.layers.forEach((ld, li) => {
       const img = new Image();
+      if (ld.__reuse) {
+        if (--pending === 0) { cur = 0; sel = -1; renderTimeline(); refreshAll(); if (zoomIsFit) zoomFit(); }
+        return;
+      }
       img.onload = () => {
         f.layers[li].cv.getContext('2d').drawImage(img, 0, 0);
         if (--pending === 0) {
@@ -3220,25 +3315,36 @@ function bakeObjects(l) {
   l.objs = [];
 }
 function deepFrame(f) {
-  return { layers: f.layers.map(l => cloneLayer(l, false)), active: f.active, delay: f.delay };
+  return { layers: f.layers.map(l => copyLayerForFrame(l, false)), active: f.active, delay: f.delay };
 }
 function mutateLayers(scope, fn) {
   stopPlay();
   pushStruct();
   const here = F();
+  // One replacement per distinct layer object. A layer shared across frames
+  // is therefore transformed once and stays a single shared layer.
+  const seen = new Map();
+  const swap = l => {
+    if (seen.has(l)) return seen.get(l);
+    const cl = cloneLayer(l, true);
+    cl.shared = l.shared; cl.sid = l.sid;
+    fn(cl);
+    seen.set(l, cl);
+    return cl;
+  };
   frames.forEach((f, i) => {
     if (scope !== 'all' && f !== here) return;
     const nf = { layers: f.layers.slice(), active: f.active, delay: f.delay };
     if (scope === 'layer') {
       const li = Math.min(f.active, f.layers.length - 1);
-      const cl = cloneLayer(f.layers[li], true);
-      fn(cl);
-      nf.layers[li] = cl;
+      nf.layers[li] = swap(f.layers[li]);
     } else {
-      nf.layers = f.layers.map(l => { const cl = cloneLayer(l, true); fn(cl); return cl; });
+      nf.layers = f.layers.map(swap);
     }
     frames[i] = nf;
   });
+  // a shared layer transformed under "this frame" must follow into the others
+  if (scope !== 'all') frames.forEach(f => { f.layers = f.layers.map(l => seen.get(l) || l); });
   sel = -1; dirty = true;
   renderTimeline(); refreshAll();
 }
@@ -3669,6 +3775,184 @@ function copyFrameToAll() {
   toast('Laid this layer over ' + n + (n === 1 ? ' other frame.' : ' other frames.'), 'good');
 }
 
+/* ========================================================= shared layers */
+/* Sharing swaps every frame's layer at this position for one and the same
+   object. Rendering, drawing and history all work on references already, so
+   nothing else has to know: paint on it from any frame and every frame
+   changes, because there is only one canvas. */
+function setLayerShared(on) {
+  if (frames.length < 2) { toast('Sharing needs more than one frame.', 'bad'); return; }
+  const f = F(), idx = Math.min(f.active, f.layers.length - 1);
+  const l = f.layers[idx];
+  if (!!l.shared === !!on) return;
+  stopPlay();
+  pushStruct();
+  if (on) {
+    l.shared = true;
+    l.sid = ++shareSeq;
+    frames.forEach((fr, i) => {
+      if (fr === f) return;
+      const nf = { layers: fr.layers.slice(), active: fr.active, delay: fr.delay };
+      const at = Math.min(idx, nf.layers.length);
+      nf.layers.splice(at, 0, l);              // same object, not a copy
+      nf.active = Math.min(nf.active, nf.layers.length - 1);
+      frames[i] = nf;
+    });
+    toast(l.name + ' is now on every frame. Drawing on it anywhere changes it everywhere.', 'good');
+  } else {
+    l.shared = false;
+    const sid = l.sid;
+    l.sid = 0;
+    frames.forEach((fr, i) => {
+      if (fr === f) return;
+      const nf = { layers: fr.layers.slice(), active: fr.active, delay: fr.delay };
+      nf.layers = nf.layers.map(q => {
+        if (q !== l) return q;
+        const c = cloneLayer(q, false);        // each frame gets its own copy
+        c.shared = false; c.sid = 0;
+        return c;
+      });
+      frames[i] = nf;
+    });
+    toast(l.name + ' is private to each frame again — every frame kept a copy.');
+  }
+  sel = -1; dirty = true;
+  renderTimeline(); refreshAll();
+}
+
+/* =================================================== collapsible sections */
+/* The panels carry a lot of controls. Making every section a disclosure lets
+   you fold away the ones this project does not need, and the choice is
+   remembered per section rather than reset on every reload. */
+function sectionKey(sec) {
+  const h = sec.querySelector(':scope > h3');
+  return h ? 'fs-sec:' + h.textContent.trim().slice(0, 40) : null;
+}
+function setSectionOpen(sec, open, remember) {
+  sec.classList.toggle('collapsed', !open);
+  const h = sec.querySelector(':scope > h3');
+  if (h) h.setAttribute('aria-expanded', String(open));
+  if (remember) {
+    const k = sectionKey(sec);
+    try { if (k) localStorage.setItem(k, open ? '1' : '0'); } catch (_) {}
+  }
+}
+function initSections() {
+  document.querySelectorAll('.sec').forEach(sec => {
+    const h = sec.querySelector(':scope > h3');
+    if (!h) return;
+    h.tabIndex = 0;
+    h.setAttribute('role', 'button');
+    const k = sectionKey(sec);
+    let open = true;
+    try { const v = localStorage.getItem(k); if (v !== null) open = v === '1'; } catch (_) {}
+    setSectionOpen(sec, open, false);
+    const toggle = () => setSectionOpen(sec, sec.classList.contains('collapsed'), true);
+    h.onclick = toggle;
+    h.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+  });
+}
+/* Opening a section from code - the text panel appearing when you pick the
+   text tool, say - should not leave it folded shut. */
+function revealSection(el) {
+  const sec = el && el.closest ? el.closest('.sec') : null;
+  if (sec && sec.classList.contains('collapsed')) setSectionOpen(sec, true, true);
+}
+function setAllSections(open) {
+  document.querySelectorAll('.sec').forEach(sec => { if (sec.querySelector(':scope > h3')) setSectionOpen(sec, open, true); });
+}
+
+/* ================================================================== APNG */
+/* Animated PNG: lossless, 8 bits per channel, real alpha - everything GIF's
+   256-colour palette cannot do. The format needs zlib streams, which the
+   platform now provides through CompressionStream, so no compressor of our
+   own is required. */
+function pngChunk(type, body) {
+  const out = new Uint8Array(12 + body.length);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, body.length);
+  for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+  out.set(body, 8);
+  dv.setUint32(8 + body.length, crc32(out.subarray(4, 8 + body.length)));
+  return out;
+}
+async function deflate(bytes) {
+  const cs = new CompressionStream('deflate');           // zlib wrapper, as PNG wants
+  const stream = new Blob([bytes]).stream().pipeThrough(cs);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+/* PNG stores each row behind a filter byte; filter 0 means "stored as is",
+   which deflate still compresses perfectly well for flat animation art. */
+function rawScanlines(img, w, h) {
+  const d = img.data;
+  const out = new Uint8Array(h * (1 + w * 4));
+  let k = 0;
+  for (let y = 0; y < h; y++) {
+    out[k++] = 0;
+    out.set(d.subarray(y * w * 4, (y + 1) * w * 4), k);
+    k += w * 4;
+  }
+  return out;
+}
+async function exportAPNG() {
+  if (typeof CompressionStream === 'undefined') { toast('This browser has no CompressionStream, so APNG is unavailable.', 'bad'); return; }
+  stopPlay();
+  const keep = sel; sel = -1;
+  const [ow, oh] = outSize();
+  const transparent = $('bg-transparent').checked;
+  progress(.02, 'Rendering frames…');
+  lastYield = performance.now();
+  await tick();
+  const imgs = [];
+  for (let i = 0; i < frames.length; i++) {
+    const c = composite(i, ow, oh).getContext('2d');
+    imgs.push(c.getImageData(0, 0, ow, oh));
+    progress(.02 + .28 * (i + 1) / frames.length);
+    await maybeYield();
+  }
+  const parts = [new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])];
+  const ihdr = new Uint8Array(13);
+  const iv = new DataView(ihdr.buffer);
+  iv.setUint32(0, ow); iv.setUint32(4, oh);
+  ihdr[8] = 8; ihdr[9] = 6;                      // 8 bits per channel, RGBA
+  parts.push(pngChunk('IHDR', ihdr));
+  const actl = new Uint8Array(8);
+  const av = new DataView(actl.buffer);
+  av.setUint32(0, imgs.length);
+  av.setUint32(4, $('loop-forever').checked ? 0 : 1);
+  parts.push(pngChunk('acTL', actl));
+  let seq = 0;
+  for (let i = 0; i < imgs.length; i++) {
+    progress(.3 + .65 * i / imgs.length, 'Compressing frame ' + (i + 1) + '/' + imgs.length + '…');
+    await maybeYield();
+    const fctl = new Uint8Array(26);
+    const fv = new DataView(fctl.buffer);
+    fv.setUint32(0, seq++);
+    fv.setUint32(4, ow); fv.setUint32(8, oh);
+    fv.setUint32(12, 0); fv.setUint32(16, 0);
+    fv.setUint16(20, Math.max(1, Math.round(frames[i].delay)));
+    fv.setUint16(22, 1000);                      // delay is in milliseconds
+    fctl[24] = transparent ? 1 : 0;              // clear to transparent, or keep
+    fctl[25] = 0;                                // replace rather than blend
+    parts.push(pngChunk('fcTL', fctl));
+    const z = await deflate(rawScanlines(imgs[i], ow, oh));
+    if (i === 0) parts.push(pngChunk('IDAT', z));
+    else {
+      const fd = new Uint8Array(4 + z.length);
+      new DataView(fd.buffer).setUint32(0, seq++);
+      fd.set(z, 4);
+      parts.push(pngChunk('fdAT', fd));
+    }
+  }
+  parts.push(pngChunk('IEND', new Uint8Array(0)));
+  const blob = new Blob(parts, { type: 'image/apng' });
+  download(blob, 'animation.png');
+  progress(-1);
+  sel = keep; repaint();
+  toast('Saved animation.png — ' + (blob.size / 1024).toFixed(0) + ' KB, lossless and full colour.', 'good');
+  flash('Animated PNG exported.');
+}
+
 /* ======================================================== command palette */
 const COMMANDS = [
   { g: 'Tool', n: 'Select tool', k: 'V', r: () => setTool('select') },
@@ -3702,6 +3986,8 @@ const COMMANDS = [
   { g: 'Layer', n: 'Merge layer down', r: mergeDown },
   { g: 'Layer', n: 'Delete layer', r: deleteLayer },
   { g: 'Layer', n: 'Flatten shapes into pixels', r: flatten },
+  { g: 'Layer', n: 'Share this layer across every frame', r: () => setLayerShared(true) },
+  { g: 'Layer', n: 'Unshare this layer', r: () => setLayerShared(false) },
   { g: 'Edit', n: 'Undo', k: 'Ctrl+Z', r: undo },
   { g: 'Edit', n: 'Redo', k: 'Ctrl+Y', r: redo },
   { g: 'Edit', n: 'Clear this frame', r: () => { pushHistory(); fctx().clearRect(0, 0, W, H); L().objs = []; sel = -1; commit(); syncSelPanel(); } },
@@ -3716,12 +4002,15 @@ const COMMANDS = [
   { g: 'View', n: 'Toggle snap to grid', r: () => { $('grid-snap').checked = !$('grid-snap').checked; toast('Snap to grid ' + ($('grid-snap').checked ? 'on.' : 'off.')); } },
   { g: 'View', n: 'Fit canvas to the window', k: '0', r: () => { zoomIsFit = true; zoomFit(); } },
   { g: 'View', n: 'Actual size', k: '1', r: () => { zoomIsFit = false; setZoom(1); } },
+  { g: 'View', n: 'Collapse every panel section', r: () => setAllSections(false) },
+  { g: 'View', n: 'Expand every panel section', r: () => setAllSections(true) },
   { g: 'View', n: 'Switch light / dark theme', r: () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light') },
   { g: 'File', n: 'Export GIF', k: 'Ctrl+E', r: () => $('btn-export').click() },
   { g: 'File', n: 'Export current frame as PNG', r: exportPNG },
   { g: 'File', n: 'Export sprite sheet', r: exportSheet },
   { g: 'File', n: 'Export every frame as PNG (zip)', r: exportAllPNGs },
   { g: 'File', n: 'Export WebM video', r: exportWebM },
+  { g: 'File', n: 'Export animated PNG (APNG)', r: exportAPNG },
   { g: 'File', n: 'Save project', k: 'Ctrl+S', r: saveProject },
   { g: 'File', n: 'Open project…', r: () => $('file-proj').click() },
   { g: 'File', n: 'Import GIF or images…', r: () => $('file-img').click() },
@@ -3831,6 +4120,7 @@ $('fx-modal').onclick = e => { if (e.target.id === 'fx-modal') fxClose(); };
 $('btn-place-img').onclick = () => $('file-place').click();
 $('file-place').onchange = e => { insertImages(e.target.files); e.target.value = ''; };
 $('btn-frame-copy').onclick = copyFrameToAll;
+$('lay-share').onclick = () => setLayerShared(!L().shared);
 $('sel-tonext').onclick = () => copySelToFrames('next');
 $('sel-toall').onclick = () => copySelToFrames('all');
 $('sel-fit').onclick = fitSelToCanvas;
@@ -3854,6 +4144,7 @@ $('btn-png').onclick = guard(exportPNG, 'PNG export');
 $('btn-sheet').onclick = guard(exportSheet, 'Sprite sheet');
 $('btn-zip').onclick = guard(exportAllPNGs, 'Frame export');
 $('btn-webm').onclick = guard(exportWebM, 'WebM export');
+$('btn-apng').onclick = guard(exportAPNG, 'APNG export');
 
 /* Shortcuts that must work even while a panel field has focus. */
 window.addEventListener('keydown', e => {
@@ -3872,6 +4163,7 @@ frames.push(newFrame());
 try { setTheme(localStorage.getItem('fs-theme') || 'dark'); } catch (_) { setTheme('dark'); }
 renderSwatches();
 renderRecents();
+initSections();
 renderFonts('');
 renderTimeline();
 updateHistoryButtons();
