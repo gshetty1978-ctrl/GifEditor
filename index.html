@@ -315,7 +315,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
   .wrap{flex:1;min-height:0;grid-template-rows:minmax(0,1fr) auto;align-items:stretch}
   .wrap > .panel{overflow:auto;max-height:100%}
   .stage{height:100%}
-  .viewport{flex:1;max-height:none}
+  .viewport{flex:1;min-height:140px;max-height:none}
   .timeline{max-height:34vh;overflow:auto}
 }
 
@@ -1610,6 +1610,7 @@ function setCropRect(r) {
   const bar = $('crop-bar');
   if (!r) { bar.style.display = 'none'; repaint(); return; }
   bar.style.display = 'flex';
+  try { bar.scrollIntoView({ block: 'nearest' }); } catch (_) {}
   $('crop-info').textContent = 'Crop to ' + Math.round(r.w) + ' \u00d7 ' + Math.round(r.h) +
     ' px, from ' + Math.round(r.x) + ',' + Math.round(r.y) + '.';
   repaint();
@@ -3538,7 +3539,15 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); redo(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'd') { e.preventDefault(); duplicateSelection(); return; }
-  if ((e.ctrlKey || e.metaKey) && k === 'c') { e.preventDefault(); copySelection(); return; }
+  // a pixel selection is the thing on screen, so it wins the clipboard
+  if ((e.ctrlKey || e.metaKey) && k === 'c') { e.preventDefault(); pixSelActive() ? pixCopy() : copySelection(); return; }
+  if ((e.ctrlKey || e.metaKey) && k === 'x') {
+    e.preventDefault();
+    if (pixSelActive()) { pixCopy(); pixDelete(); }
+    else if (sel >= 0) { copySelection(); deleteSelection(); }
+    else toast('Nothing selected to cut.', 'bad');
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && k === 'v') { e.preventDefault(); pasteSelection(); return; }
   if (e.ctrlKey || e.metaKey) return;
   if (e.key === 'Escape') { if (pixSelActive()) { dropPixels(); setPixSelMask(null); return; }
@@ -4411,8 +4420,11 @@ function setPixSelMask(data, kind) {
     for (let k = 0; k < pixSel.data.length; k++) if (pixSel.data[k]) n++;
     bar.style.display = 'flex';
     $('pixsel-info').textContent = kind + ' selection — ' + b.w + ' × ' + b.h +
-      ' px box, ' + n.toLocaleString() + ' pixels. Drag inside it to move them.';
+      ' px box, ' + n.toLocaleString() + ' pixels. Drag inside it to move them, or Ctrl+C to copy.';
     startAnts();
+    // the stage scrolls, and a bar that appears below the fold may as well
+    // not exist - which is how a selection can look like it has no actions
+    try { bar.scrollIntoView({ block: 'nearest' }); } catch (_) {}
   }
   repaint();
 }
@@ -5056,7 +5068,8 @@ const COMMANDS = [
   { g: 'Tool', n: 'Lasso — select pixels freehand', k: 'Q', r: () => setTool('lasso') },
   { g: 'Tool', n: 'Magic wand — select by colour', k: 'W', r: () => setTool('wand') },
   { g: 'Edit', n: 'Lift the selected pixels to an object', r: () => pixToObject(true) },
-  { g: 'Edit', n: 'Copy the selected pixels', r: pixCopy },
+  { g: 'Edit', n: 'Copy the selected pixels', k: 'Ctrl+C', r: pixCopy },
+  { g: 'Edit', n: 'Cut the selected pixels', k: 'Ctrl+X', r: () => { pixCopy(); pixDelete(); } },
   { g: 'Edit', n: 'Fill the pixel selection', r: pixFill },
   { g: 'Edit', n: 'Deselect pixels', r: () => { dropPixels(); setPixSelMask(null); } },
   { g: 'Edit', n: 'Invert the pixel selection', r: pixInvert },
