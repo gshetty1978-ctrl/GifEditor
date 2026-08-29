@@ -414,11 +414,13 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <label class="row" style="margin-top:10px">Smoothing <span id="smooth-val" style="color:var(--text)">0%</span></label>
       <input type="range" id="smooth" min="0" max="90" value="0" title="Steadies a shaky hand on brush and eraser strokes">
       <label class="row">Fill tolerance <span id="tol-val" style="color:var(--text)">24</span></label>
-      <input type="range" id="tol" min="0" max="160" value="24" title="How different a neighbouring pixel may be and still be filled">
+      <input type="range" id="tol" min="0" max="160" value="24" title="How different a pixel may be and still count as the same colour, for both Fill and the Wand">
+      <label class="row">Wand: contiguous only <input type="checkbox" id="wand-contig" checked title="On: only the patch you click. Off: every matching pixel on the layer."></label>
       <h4>Edit</h4>
       <div class="grid2">
         <button data-tool="marquee" title="Select a rectangle of pixels — M">▭ Marquee<span class="k">M</span></button>
         <button data-tool="lasso" title="Draw a freehand pixel selection — Q">✎ Lasso<span class="k">Q</span></button>
+        <button data-tool="wand" title="Select every pixel of a similar colour — W">🪄 Wand<span class="k">W</span></button>
         <button data-tool="crop" title="Crop the canvas to a region — C">✂ Crop<span class="k">C</span></button>
         <button data-tool="select" title="Select, move, resize and rotate — V">🖱️ Select<span class="k">V</span></button>
         <button id="btn-flatten" title="Bake shapes and text into pixels">🔒 Flatten</button>
@@ -580,6 +582,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <button id="pix-copy" title="Copy the pixels, ready to paste — including onto another frame">📋 Copy</button>
       <button id="pix-fill" title="Fill the selection with the current colour">🪣 Fill</button>
       <button id="pix-crop" title="Crop the canvas to this selection">✂ Crop to it</button>
+      <button id="pix-invert" title="Select everything except this">⇄ Invert</button>
       <button id="pix-del" class="danger" title="Erase the pixels inside the selection">🗑️ Delete</button>
       <button id="pix-none">Deselect</button>
     </div>
@@ -1766,7 +1769,7 @@ function stopPlay() {
 /* ------------------------------------------------------------ tool setup */
 function setTool(t, sh) {
   if (typeof pixFloat !== 'undefined' && pixFloat && t !== tool) dropPixels();
-  if (t !== 'marquee' && t !== 'lasso' && typeof pixSel !== 'undefined' && pixSel) setPixSel(null);
+  if (t !== 'marquee' && t !== 'lasso' && t !== 'wand' && typeof pixSel !== 'undefined' && pixSel) setPixSelMask(null);
   tool = t; shape = sh || null;
   document.querySelectorAll('#tools button[data-tool],#stamps button').forEach(b => b.classList.remove('on'));
   const btn = document.querySelector(sh ? '#stamps [data-shape="' + sh + '"]' : '#tools [data-tool="' + t + '"]');
@@ -1785,6 +1788,7 @@ function setTool(t, sh) {
     text: 'Text — click the canvas to place your text.', eyedrop: 'Picker — click to sample a colour.',
     marquee: 'Marquee — drag out a rectangle of pixels. Drag inside it to move them.',
     lasso: 'Lasso — draw around the pixels you want. Drag inside to move them.',
+    wand: 'Wand — click a colour to select it. Fill tolerance sets how close a match must be.',
     spray: 'Airbrush — hold and move. Size sets the spread, opacity the density.',
     smudge: 'Smudge — drag to pull colour along. Opacity sets the strength.',
     pan: 'Pan - drag to move around the canvas. Ctrl+wheel zooms.',
@@ -1796,7 +1800,7 @@ function setTool(t, sh) {
   view.style.cursor = t === 'crop' ? 'crosshair'
     : t === 'pan' ? 'grab'
     : t === 'select' ? 'default'
-    : (t === 'fill' || t === 'eyedrop' ? 'cell' : 'crosshair');
+    : (t === 'fill' || t === 'eyedrop' || t === 'wand' ? 'cell' : 'crosshair');
   repaint();
 }
 
@@ -1858,7 +1862,7 @@ let pendingHist = false;
 function armHistory() { pendingHist = true; }
 function fireHistory() { if (pendingHist) { pendingHist = false; pushHistory(); } }
 
-const FREEHAND = { brush: 1, eraser: 1, spray: 1, smudge: 1, pan: 1, lasso: 1 };
+const FREEHAND = { brush: 1, eraser: 1, spray: 1, smudge: 1, pan: 1, lasso: 1, wand: 1 };
 function pos(e) {
   const r = view.getBoundingClientRect();
   const p = { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
@@ -1993,7 +1997,7 @@ view.addEventListener('pointerdown', e => {
   }
 
   /* ---- pixel selection ---- */
-  if (tool === 'marquee' || tool === 'lasso') {
+  if (tool === 'marquee' || tool === 'lasso' || tool === 'wand') {
     if (pointInSel(p)) {                       // grab the pixels and drag them
       pushHistory();
       liftPixels();
@@ -2002,9 +2006,10 @@ view.addEventListener('pointerdown', e => {
       return;
     }
     dropPixels();
+    if (tool === 'wand') { setPixSelMask(null); wandSelect(p); return; }
     drawing = true; mode = 'pixdraw';
     grab = { x: p.x, y: p.y, pts: [{ x: p.x, y: p.y }] };
-    setPixSel(null);
+    setPixSelMask(null);
     return;
   }
 
@@ -2064,7 +2069,7 @@ view.addEventListener('pointermove', e => {
       const last = grab.pts[grab.pts.length - 1];
       if (Math.hypot(p.x - last.x, p.y - last.y) > 2.5) grab.pts.push({ x: p.x, y: p.y });
     }
-    pixSel = { pts: grab.pts, rect: tool === 'marquee' };
+    pixDraft = { pts: grab.pts };            // outline only until the drag ends
     repaint();
   } else if (mode === 'pixmove' && pixFloat) {
     pixFloat.dx = p.x - grab.px;
@@ -2142,12 +2147,12 @@ window.addEventListener('pointerup', () => {
   if (mode === 'pixdraw') {
     mode = null;
     const pts = grab ? grab.pts : null;
-    grab = null;
-    const big = pts && pts.length > 2 && (() => { const b = selBounds(pts); return b.w > 3 && b.h > 3; })();
-    setPixSel(big ? pts : null, tool === 'marquee');
+    grab = null; pixDraft = null;
+    setPixSelMask(pts && pts.length > 2 ? polyToMask(pts) : null,
+                  tool === 'marquee' ? 'Rectangle' : 'Lasso');
     return;
   }
-  if (mode === 'pixmove') { mode = null; grab = null; dropPixels(); setPixSel(pixSel ? pixSel.pts : null, pixSel && pixSel.rect); return; }
+  if (mode === 'pixmove') { mode = null; grab = null; dropPixels(); repaint(); return; }
   if (mode === 'pan') { mode = null; grab = null; view.style.cursor = tool === 'pan' ? 'grab' : ''; setTool(tool, shape); return; }
   if (mode === 'ref') { mode = null; grab = null; repaint(); return; }
   const wasCreate = mode === 'create';
@@ -3535,7 +3540,7 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k === 'c') { e.preventDefault(); copySelection(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'v') { e.preventDefault(); pasteSelection(); return; }
   if (e.ctrlKey || e.metaKey) return;
-  if (e.key === 'Escape') { if (pixSelActive()) { dropPixels(); setPixSel(null); return; }
+  if (e.key === 'Escape') { if (pixSelActive()) { dropPixels(); setPixSelMask(null); return; }
     if (cropRect) { setCropRect(null); return; } sel = -1; syncSelPanel(); repaint(); return; }
   if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIsFit = false; setZoom(zoom * 1.25); return; }
   if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomIsFit = false; setZoom(zoom / 1.25); return; }
@@ -3552,6 +3557,7 @@ window.addEventListener('keydown', e => {
   }
   if (k === 'm') { setTool('marquee'); return; }
   if (k === 'q') { setTool('lasso'); return; }
+  if (k === 'w') { setTool('wand'); return; }
   if (e.key === '/') { e.preventDefault(); $('find').focus(); $('find').select(); return; }
   if (e.key === ',') { selectFrame(cur - 1); return; }
   if (e.key === '.') { selectFrame(cur + 1); return; }
@@ -4309,16 +4315,19 @@ document.addEventListener('pointerdown', e => {
 }, true);
 
 /* ======================================================== pixel selection */
-/* Select and Copy have only ever worked on shapes, text and images. This is
-   the same for painted pixels: mark a region, then move, erase, fill or lift
-   it. "To object" turns the pixels into an image object, which hands them
-   the transform handles and the copy-to-frames buttons already built for
-   objects rather than reimplementing scaling and rotation here. */
-let pixSel = null;          // {pts:[{x,y}], rect:bool}
+/* Select, then move, erase, fill or lift painted pixels - the thing the
+   object Select tool never covered.
+
+   A selection is a mask, not an outline. The wand produces a region no
+   polygon can describe, so marquee and lasso rasterise their shape into the
+   same mask and every operation downstream works one way: composite the mask
+   against the layer, rather than clipping to a path. */
+let pixSel = null;          // {cv, data, b, kind, ants:[a,b]}
+let pixDraft = null;        // the shape being dragged out, before it is rasterised
 let pixFloat = null;        // pixels lifted off the layer during a drag
 let antsPhase = 0, antsTimer = null;
 
-function selPath(pts, dx, dy) {
+function polyPath(pts, dx, dy) {
   const path = new Path2D();
   pts.forEach((q, i) => {
     const x = q.x + (dx || 0), y = q.y + (dy || 0);
@@ -4327,77 +4336,130 @@ function selPath(pts, dx, dy) {
   path.closePath();
   return path;
 }
-function selBounds(pts) {
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const q of pts) {
-    if (q.x < x0) x0 = q.x;
-    if (q.x > x1) x1 = q.x;
-    if (q.y < y0) y0 = q.y;
-    if (q.y > y1) y1 = q.y;
+function maskBounds(data) {
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0, k = 0; y < H; y++) {
+    for (let x = 0; x < W; x++, k++) {
+      if (!data[k]) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
   }
-  x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0));
-  x1 = Math.min(W, Math.ceil(x1)); y1 = Math.min(H, Math.ceil(y1));
-  return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) };
+  if (x1 < 0) return null;
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
-function pixSelActive() { return !!(pixSel && pixSel.pts.length > 2); }
-function setPixSel(pts, rect) {
-  pixSel = pts && pts.length > 2 ? { pts, rect: !!rect } : null;
+/* Two outline canvases whose dashes are the inverse of each other. Swapping
+   between them is what makes the border crawl. */
+function buildAnts(data) {
+  const a = makeCanvas(W, H), b = makeCanvas(W, H);
+  const ca = a.getContext('2d'), cb = b.getContext('2d');
+  const ia = ca.createImageData(W, H), ib = cb.createImageData(W, H);
+  for (let y = 0, k = 0; y < H; y++) {
+    for (let x = 0; x < W; x++, k++) {
+      if (!data[k]) continue;
+      // an edge pixel is one with at least one neighbour outside the mask
+      const edge = x === 0 || y === 0 || x === W - 1 || y === H - 1 ||
+        !data[k - 1] || !data[k + 1] || !data[k - W] || !data[k + W];
+      if (!edge) continue;
+      const on = (((x + y) >> 2) & 1) === 0;
+      const j = k * 4;
+      ia.data[j] = ia.data[j + 1] = ia.data[j + 2] = on ? 255 : 0;
+      ia.data[j + 3] = 255;
+      ib.data[j] = ib.data[j + 1] = ib.data[j + 2] = on ? 0 : 255;
+      ib.data[j + 3] = 255;
+    }
+  }
+  ca.putImageData(ia, 0, 0);
+  cb.putImageData(ib, 0, 0);
+  return [a, b];
+}
+function maskToSel(data, kind) {
+  const b = maskBounds(data);
+  if (!b || b.w < 2 || b.h < 2) return null;
+  const cv = makeCanvas(W, H, true), c = cv.getContext('2d');
+  const img = c.createImageData(W, H);
+  for (let k = 0; k < data.length; k++) {
+    if (!data[k]) continue;
+    const j = k * 4;
+    img.data[j] = img.data[j + 1] = img.data[j + 2] = img.data[j + 3] = 255;
+  }
+  c.putImageData(img, 0, 0);
+  return { cv, data, b, kind, ants: buildAnts(data) };
+}
+function polyToMask(pts) {
+  const cv = makeCanvas(W, H, true), c = cv.getContext('2d');
+  c.fillStyle = '#fff';
+  c.fill(polyPath(pts));
+  const d = c.getImageData(0, 0, W, H).data;
+  const data = new Uint8Array(W * H);
+  for (let k = 0; k < data.length; k++) data[k] = d[k * 4 + 3] > 127 ? 1 : 0;
+  return data;
+}
+function pixSelActive() { return !!pixSel; }
+function setPixSelMask(data, kind) {
+  pixSel = data ? maskToSel(data, kind) : null;
   const bar = $('pixsel-bar');
-  if (!pixSelActive()) {
+  if (!pixSel) {
     bar.style.display = 'none';
     stopAnts();
   } else {
-    const b = selBounds(pixSel.pts);
+    const b = pixSel.b;
+    let n = 0;
+    for (let k = 0; k < pixSel.data.length; k++) if (pixSel.data[k]) n++;
     bar.style.display = 'flex';
-    $('pixsel-info').textContent = (pixSel.rect ? 'Rectangle' : 'Lasso') + ' selection — ' +
-      b.w + ' \u00d7 ' + b.h + ' px. Drag inside it to move the pixels.';
+    $('pixsel-info').textContent = kind + ' selection — ' + b.w + ' × ' + b.h +
+      ' px box, ' + n.toLocaleString() + ' pixels. Drag inside it to move them.';
     startAnts();
   }
   repaint();
 }
 function startAnts() {
   if (antsTimer) return;
-  antsTimer = setInterval(() => { antsPhase = (antsPhase + 1) % 8; if (!playing) repaint(); }, 110);
+  antsTimer = setInterval(() => { antsPhase ^= 1; if (!playing) repaint(); }, 130);
 }
-function stopAnts() {
-  clearInterval(antsTimer);
-  antsTimer = null;
-}
+function stopAnts() { clearInterval(antsTimer); antsTimer = null; }
 function drawPixSel() {
-  if (!pixSelActive()) return;
-  const u = perPx();
-  const path = selPath(pixSel.pts, pixFloat ? pixFloat.dx : 0, pixFloat ? pixFloat.dy : 0);
-  vctx.save();
-  vctx.globalAlpha = 1;
-  vctx.lineWidth = 1.4 * u;
-  vctx.setLineDash([5 * u, 4 * u]);
-  vctx.lineDashOffset = -antsPhase * u;
-  vctx.strokeStyle = 'rgba(0,0,0,.85)';
-  vctx.stroke(path);
-  vctx.strokeStyle = 'rgba(255,255,255,.95)';
-  vctx.lineDashOffset = -antsPhase * u + 5 * u;
-  vctx.stroke(path);
-  vctx.restore();
+  const dx = pixFloat ? pixFloat.dx : 0, dy = pixFloat ? pixFloat.dy : 0;
+  if (pixSel) vctx.drawImage(pixSel.ants[antsPhase], dx, dy);
+  if (pixDraft) {                       // live outline while the shape is dragged out
+    const u = perPx();
+    vctx.save();
+    vctx.lineWidth = 1.4 * u;
+    vctx.setLineDash([5 * u, 4 * u]);
+    vctx.strokeStyle = '#fff';
+    vctx.stroke(polyPath(pixDraft.pts));
+    vctx.restore();
+  }
 }
 function pointInSel(p) {
-  if (!pixSelActive()) return false;
-  return vctx.isPointInPath(selPath(pixSel.pts, pixFloat ? pixFloat.dx : 0, pixFloat ? pixFloat.dy : 0), p.x, p.y);
+  if (!pixSel) return false;
+  const dx = pixFloat ? pixFloat.dx : 0, dy = pixFloat ? pixFloat.dy : 0;
+  const x = Math.floor(p.x - dx), y = Math.floor(p.y - dy);
+  if (x < 0 || y < 0 || x >= W || y >= H) return false;
+  return !!pixSel.data[y * W + x];
 }
-/* Lift the selected pixels onto their own canvas and clear the hole they
-   leave, so dragging shows what a move will actually look like. */
-function liftPixels() {
-  const b = selBounds(pixSel.pts);
+/* Masked copy of a layer: draw the pixels, then keep only what the mask
+   covers. Every operation below is built on this one primitive. */
+function maskedCopy(srcCv, b) {
   const cv = makeCanvas(b.w, b.h, true), c = cv.getContext('2d');
-  c.save();
-  c.translate(-b.x, -b.y);
-  c.clip(selPath(pixSel.pts));
-  c.drawImage(L().cv, 0, 0);
-  c.restore();
-  const lc = fctx();
-  lc.save();
-  lc.clip(selPath(pixSel.pts));
-  lc.clearRect(0, 0, W, H);
-  lc.restore();
+  c.drawImage(srcCv, -b.x, -b.y);
+  c.globalCompositeOperation = 'destination-in';
+  c.drawImage(pixSel.cv, -b.x, -b.y);
+  return cv;
+}
+function eraseSelection(ctx) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.globalAlpha = 1;
+  ctx.drawImage(pixSel.cv, 0, 0);
+  ctx.restore();
+}
+function liftPixels() {
+  const b = pixSel.b;
+  const cv = maskedCopy(L().cv, b);
+  eraseSelection(fctx());
   pixFloat = { cv, x: b.x, y: b.y, dx: 0, dy: 0 };
 }
 function dropPixels() {
@@ -4408,84 +4470,77 @@ function dropPixels() {
   c.globalAlpha = 1;
   c.drawImage(pixFloat.cv, pixFloat.x + pixFloat.dx, pixFloat.y + pixFloat.dy);
   c.restore();
-  if (pixFloat.dx || pixFloat.dy) {
-    pixSel.pts = pixSel.pts.map(q => ({ x: q.x + pixFloat.dx, y: q.y + pixFloat.dy }));
-  }
+  const dx = Math.round(pixFloat.dx), dy = Math.round(pixFloat.dy);
   pixFloat = null;
+  if ((dx || dy) && pixSel) {           // the mask travels with the pixels
+    const moved = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) {
+      const sy = y - dy;
+      if (sy < 0 || sy >= H) continue;
+      for (let x = 0; x < W; x++) {
+        const sx = x - dx;
+        if (sx < 0 || sx >= W) continue;
+        moved[y * W + x] = pixSel.data[sy * W + sx];
+      }
+    }
+    pixSel = maskToSel(moved, pixSel.kind);
+    if (!pixSel) setPixSelMask(null);
+  }
   commit();
 }
 function pixDelete() {
-  if (!pixSelActive()) return;
+  if (!pixSel) return;
   pushHistory();
-  const c = fctx();
-  c.save();
-  c.clip(selPath(pixSel.pts));
-  c.clearRect(0, 0, W, H);
-  c.restore();
+  eraseSelection(fctx());
   commit();
   toast('Cleared the selected pixels.');
 }
 function pixFill() {
-  if (!pixSelActive()) return;
+  if (!pixSel) return;
   pushHistory();
+  const t = makeCanvas(W, H, true), tc = t.getContext('2d');
+  paintStyle(tc);
+  tc.globalAlpha = 1;
+  tc.fillRect(0, 0, W, H);
+  tc.globalCompositeOperation = 'destination-in';
+  tc.drawImage(pixSel.cv, 0, 0);
   const c = fctx();
   c.save();
-  c.clip(selPath(pixSel.pts));
-  paintStyle(c);
+  c.globalAlpha = +$('alpha').value / 100;
   c.globalCompositeOperation = 'source-over';
-  c.fillRect(0, 0, W, H);
+  c.drawImage(t, 0, 0);
   c.restore();
   commit();
 }
-/* The pixels become an image object, which is what gives them scaling,
-   rotation, opacity and the copy-to-other-frames buttons for free. */
+/* Handing the pixels to an image object is what gives them scaling, rotation
+   and the copy-to-frames buttons, instead of a second transform system. */
 function pixToObject(cutFromLayer) {
-  if (!pixSelActive()) return;
-  const b = selBounds(pixSel.pts);
-  const cv = makeCanvas(b.w, b.h, true), c = cv.getContext('2d');
-  c.save();
-  c.translate(-b.x, -b.y);
-  c.clip(selPath(pixSel.pts));
-  c.drawImage(L().cv, 0, 0);
-  c.restore();
-  const src = cv.toDataURL('image/png');
+  if (!pixSel) return;
+  const b = pixSel.b;
+  const src = maskedCopy(L().cv, b).toDataURL('image/png');
   const img = new Image();
-  const finish = () => {
+  img.onload = () => {
     pushHistory();
-    if (cutFromLayer) {
-      const lc = fctx();
-      lc.save();
-      lc.clip(selPath(pixSel.pts));
-      lc.clearRect(0, 0, W, H);
-      lc.restore();
-    }
-    const o = {
+    if (cutFromLayer) eraseSelection(fctx());
+    L().objs.push({
       id: nextObjId(), type: 'image', kind: 'image', src, img,
       x: b.x + b.w / 2, y: b.y + b.h / 2, rot: 0, alpha: 1,
       w: b.w, h: b.h, color: '#ffffff', mode: 'fill', lw: 1
-    };
-    L().objs.push(o);
+    });
     sel = L().objs.length - 1;
-    setPixSel(null);
+    setPixSelMask(null);
     setTool('select');
     dirty = true;
     commit(); syncSelPanel();
     toast('Lifted to an object — drag, resize, rotate, or send it to other frames.', 'good');
   };
-  img.onload = finish;
   img.onerror = () => toast('Those pixels could not be lifted.', 'bad');
   img.src = src;
 }
 function pixCopy() {
-  if (!pixSelActive()) return;
-  const b = selBounds(pixSel.pts);
-  const cv = makeCanvas(b.w, b.h, true), c = cv.getContext('2d');
-  c.save();
-  c.translate(-b.x, -b.y);
-  c.clip(selPath(pixSel.pts));
-  c.drawImage(L().cv, 0, 0);
-  c.restore();
-  const src = cv.toDataURL('image/png');
+  if (!pixSel) return;
+  const b = pixSel.b;
+  const src = maskedCopy(L().cv, b).toDataURL('image/png');
   const img = new Image();
   img.onload = () => {
     objClip = {
@@ -4493,23 +4548,81 @@ function pixCopy() {
       x: b.x + b.w / 2, y: b.y + b.h / 2, rot: 0, alpha: 1,
       w: b.w, h: b.h, color: '#ffffff', mode: 'fill', lw: 1
     };
-    toast('Copied ' + b.w + ' \u00d7 ' + b.h + ' px. Ctrl+V pastes it, on this frame or any other.');
+    toast('Copied ' + b.w + ' × ' + b.h + ' px. Ctrl+V pastes it, on this frame or any other.');
   };
   img.src = src;
 }
 function pixCrop() {
-  if (!pixSelActive()) return;
-  const b = selBounds(pixSel.pts);
+  if (!pixSel) return;
   setTool('crop');
-  setCropRect(b);
+  setCropRect(pixSel.b);
   toast('Crop set to the selection. Press Apply to confirm.');
 }
-$('pix-none').onclick = () => { dropPixels(); setPixSel(null); };
+function pixInvert() {
+  if (!pixSel) return;
+  const inv = new Uint8Array(W * H);
+  for (let k = 0; k < inv.length; k++) inv[k] = pixSel.data[k] ? 0 : 1;
+  setPixSelMask(inv, 'Inverted');
+}
+
+/* ============================================================ magic wand */
+/* Select by colour rather than by shape. Contiguous walks outward from the
+   pixel you clicked; the alternative takes every matching pixel on the
+   layer, which is how you catch every instance of one colour at once. */
+function wandSelect(p) {
+  const img = fctx().getImageData(0, 0, W, H);
+  const d = img.data;
+  const x0 = Math.floor(p.x), y0 = Math.floor(p.y);
+  if (x0 < 0 || y0 < 0 || x0 >= W || y0 >= H) return;
+  const s = (y0 * W + x0) * 4;
+  const tr = d[s], tg = d[s + 1], tb = d[s + 2], ta = d[s + 3];
+  const t0 = Math.max(0, +$('tol').value || 0);
+  const tol = t0 * t0 * 4;
+  const match = k => {
+    const j = k * 4;
+    // two fully transparent pixels are the same colour whatever their RGB says
+    if (ta < 8 && d[j + 3] < 8) return true;
+    const dr = d[j] - tr, dg = d[j + 1] - tg, db = d[j + 2] - tb, da = d[j + 3] - ta;
+    return dr * dr + dg * dg + db * db + da * da <= tol;
+  };
+  const mask = new Uint8Array(W * H);
+  if (!$('wand-contig').checked) {
+    for (let k = 0; k < mask.length; k++) if (match(k)) mask[k] = 1;
+  } else {
+    const stack = [[x0, y0]];
+    while (stack.length) {
+      const [sx, sy] = stack.pop();
+      const row = sy * W;
+      let x = sx;
+      while (x >= 0 && !mask[row + x] && match(row + x)) x--;
+      x++;
+      let up = false, down = false;
+      for (; x < W && !mask[row + x] && match(row + x); x++) {
+        mask[row + x] = 1;
+        if (sy > 0) {
+          const m = !mask[row - W + x] && match(row - W + x);
+          if (m && !up) { stack.push([x, sy - 1]); up = true; } else if (!m) up = false;
+        }
+        if (sy < H - 1) {
+          const m = !mask[row + W + x] && match(row + W + x);
+          if (m && !down) { stack.push([x, sy + 1]); down = true; } else if (!m) down = false;
+        }
+      }
+    }
+  }
+  let n = 0;
+  for (let k = 0; k < mask.length; k++) if (mask[k]) n++;
+  if (!n) { toast('Nothing on this layer matches that pixel.', 'bad'); return; }
+  setPixSelMask(mask, $('wand-contig').checked ? 'Wand' : 'Wand (whole layer)');
+}
+
+$('pix-none').onclick = () => { dropPixels(); setPixSelMask(null); };
 $('pix-del').onclick = pixDelete;
 $('pix-fill').onclick = pixFill;
 $('pix-object').onclick = () => pixToObject(true);
 $('pix-copy').onclick = pixCopy;
 $('pix-crop').onclick = pixCrop;
+$('pix-invert').onclick = pixInvert;
 
 /* ==================================================== playback & presets */
 let playSpeed = 1;
@@ -4931,10 +5044,12 @@ const COMMANDS = [
   { g: 'Tool', n: 'Crop', k: 'C', r: () => setTool('crop') },
   { g: 'Tool', n: 'Marquee — select pixels', k: 'M', r: () => setTool('marquee') },
   { g: 'Tool', n: 'Lasso — select pixels freehand', k: 'Q', r: () => setTool('lasso') },
+  { g: 'Tool', n: 'Magic wand — select by colour', k: 'W', r: () => setTool('wand') },
   { g: 'Edit', n: 'Lift the selected pixels to an object', r: () => pixToObject(true) },
   { g: 'Edit', n: 'Copy the selected pixels', r: pixCopy },
   { g: 'Edit', n: 'Fill the pixel selection', r: pixFill },
-  { g: 'Edit', n: 'Deselect pixels', r: () => { dropPixels(); setPixSel(null); } },
+  { g: 'Edit', n: 'Deselect pixels', r: () => { dropPixels(); setPixSelMask(null); } },
+  { g: 'Edit', n: 'Invert the pixel selection', r: pixInvert },
   { g: 'Symmetry', n: 'Symmetry off', r: () => setSymmetry('off') },
   { g: 'Symmetry', n: 'Mirror horizontally', r: () => setSymmetry('x') },
   { g: 'Symmetry', n: 'Mirror vertically', r: () => setSymmetry('y') },
