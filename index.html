@@ -143,6 +143,27 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #pixsel-bar .grow{flex:1;color:var(--muted);min-width:110px}
 #pixsel-bar button{padding:6px 9px}
 
+/* ---- find a control ----
+   The panels hold well over a hundred controls across ten collapsible
+   sections. Search walks you to one: it opens the section, un-hides the rail
+   it lives on, scrolls it into view and rings it. */
+.finder{position:relative;flex:0 1 260px;min-width:150px}
+.finder input{padding:6px 9px;font-size:12.5px}
+#find-list{position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:70;display:none;
+  max-height:min(58vh,420px);overflow:auto;padding:5px;border-radius:10px;
+  background:var(--panel);border:1px solid var(--line);box-shadow:0 18px 44px rgba(0,0,0,.5)}
+#find-list.open{display:block}
+.fhit{display:flex;align-items:baseline;gap:8px;padding:7px 9px;border-radius:7px;cursor:pointer;font-size:13px}
+.fhit:hover,.fhit.on{background:var(--accent);color:#fff}
+.fhit .where{margin-left:auto;font-size:11px;opacity:.72;white-space:nowrap}
+.fhit .none{opacity:.6}
+@keyframes findring{0%{box-shadow:0 0 0 0 rgba(76,141,255,.9)}100%{box-shadow:0 0 0 14px rgba(76,141,255,0)}}
+.findhit{animation:findring 1.1s ease-out 2;border-radius:8px;
+  outline:2px solid var(--accent);outline-offset:2px}
+
+#credit{flex:0 0 auto;text-align:center;padding:7px 12px 10px;font-size:11px;color:var(--muted);
+  letter-spacing:.04em;opacity:.8}
+
 /* ---- brand ---- */
 .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:inherit;flex:0 0 auto}
 .brand .mark{width:30px;height:30px;flex:0 0 auto}
@@ -344,10 +365,15 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <span class="words"><b>FRAME STUDIO</b><i>GIF editing. Simplified.</i></span>
   </a>
   <span class="badge">offline · no libraries</span>
+  <div class="finder">
+    <input type="text" id="find" placeholder="🔎 Find a tool or setting…  ( / )" autocomplete="off" spellcheck="false">
+    <div id="find-list"></div>
+  </div>
   <span class="saving" id="save-state"></span>
   <div class="spacer"></div>
   <button id="btn-rail-l" class="on" title="Show or hide the tool rail">◧</button>
   <button id="btn-rail-r" class="on" title="Show or hide the properties rail">◨</button>
+  <button id="btn-rail-t" class="on" title="Show or hide the timeline">▤</button>
   <button id="btn-focus" title="Focus mode — hide both rails and the timeline (Tab)">⛶ Focus</button>
   <button id="btn-cmdk" title="Command palette (Ctrl+K)">⌘ Commands</button>
   <button id="btn-theme" title="Switch between dark and light">🌙 Dark</button>
@@ -739,6 +765,8 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <span id="st-export">—</span>
   </div>
 </div>
+
+<footer id="credit">A Kiaan Ganesh Shetty Creation · 2026 · 30-08</footer>
 
 <input type="file" id="file-img" accept="image/*,.gif" multiple hidden>
 <input type="file" id="file-proj" accept="application/json,.json" hidden>
@@ -3524,6 +3552,7 @@ window.addEventListener('keydown', e => {
   }
   if (k === 'm') { setTool('marquee'); return; }
   if (k === 'q') { setTool('lasso'); return; }
+  if (e.key === '/') { e.preventDefault(); $('find').focus(); $('find').select(); return; }
   if (e.key === ',') { selectFrame(cur - 1); return; }
   if (e.key === '.') { selectFrame(cur + 1); return; }
   if (k === 'x') {                               // flip between the last two colours
@@ -4123,6 +4152,162 @@ function setLayerShared(on) {
   renderTimeline(); refreshAll();
 }
 
+/* ============================================================ find a control */
+/* An index of everything on the panels, built from the DOM so it cannot drift
+   out of step with the interface the way a hand-written list would. */
+let findIndex = [];
+function labelFor(el) {
+  if (el.tagName === 'BUTTON') return el.textContent.replace(/\s+/g, ' ').trim();
+  const row = el.closest('.fx-row');
+  if (row) return row.querySelector('span') ? row.querySelector('span').textContent.trim() : '';
+  let lab = el.closest('label');
+  // ranges are written as <label>Name <span>value</span></label><input type=range>,
+  // so the name lives in the previous sibling rather than around the control
+  if (!lab) {
+    const prev = el.previousElementSibling;
+    if (prev && prev.tagName === 'LABEL') lab = prev;
+  }
+  if (lab) {
+    // a <select>'s own option text is not part of its name
+    let t = '';
+    lab.childNodes.forEach(n => {
+      if (n.nodeType === 3) t += n.textContent;
+      else if (n.nodeType === 1 && /-val$/.test(n.id || '')) return;      // a live readout, not a name
+      else if (n.nodeType === 1 && !/^(SELECT|INPUT|TEXTAREA|BUTTON)$/.test(n.tagName)) t += n.textContent;
+    });
+    return t.replace(/\s+/g, ' ').trim();
+  }
+  if (el.placeholder) return el.placeholder.replace(/[🔎…]/g, '').trim();
+  if (el.title) return el.title;
+  return '';
+}
+function buildFindIndex() {
+  findIndex = [];
+  const seen = new Set();
+  document.querySelectorAll('.wrap .sec, .toolbar, .zoombar, #tl-head').forEach(sec => {
+    const h = sec.querySelector ? sec.querySelector(':scope > h3') : null;
+    const where = h ? h.textContent.trim()
+      : sec.classList.contains('toolbar') ? '🎞️ Frames'
+      : sec.classList.contains('zoombar') ? '🔍 Zoom' : '🎞️ Timeline';
+    // walk in document order so each control picks up the sub-heading above it:
+    // the symmetry mirrors are labelled with glyphs, and "Symmetry" is the
+    // word anyone would actually type
+    let group = '';
+    sec.querySelectorAll('h4, button, input, select, textarea').forEach(el => {
+      if (el.tagName === 'H4') { group = el.textContent.trim(); return; }
+      if (seen.has(el) || el.type === 'hidden') return;
+      const name = labelFor(el);
+      if (!name || name.length > 70) return;
+      seen.add(el);
+      findIndex.push({
+        el, name,
+        where: where + (group ? ' › ' + group : ''),
+        extra: (el.title || '') + ' ' + (el.id || '') + ' ' + group
+      });
+    });
+  });
+  // the filter sliders live in a dialog, but "blur" and "contrast" are exactly
+  // the words someone will search for
+  document.querySelectorAll('#fx-modal .fx-row input, #fx-modal select').forEach(el => {
+    if (seen.has(el)) return;
+    const name = labelFor(el);
+    if (!name) return;
+    seen.add(el);
+    findIndex.push({ el, name, where: '🎨 Adjust & filter', extra: 'filter effect adjust' });
+  });
+  // the header's own buttons are worth finding too
+  document.querySelectorAll('header button').forEach(el => {
+    if (seen.has(el)) return;
+    const name = el.textContent.replace(/\s+/g, ' ').trim();
+    if (!name) return;
+    seen.add(el);
+    findIndex.push({ el, name, where: '⬆️ Toolbar', extra: el.title || '' });
+  });
+}
+let findMatches = [], findIdx = 0;
+function findRender() {
+  const q = $('find').value.trim().toLowerCase();
+  const list = $('find-list');
+  if (!q) { list.classList.remove('open'); list.innerHTML = ''; return; }
+  const terms = q.split(/\s+/).filter(Boolean);
+  const score = (it, ts) => {
+    const name = it.name.toLowerCase();
+    if (!ts.every(t => (name + ' ' + it.where + ' ' + it.extra).toLowerCase().includes(t))) return -1;
+    if (name.startsWith(ts[0])) return 3;             // a leading match is what you meant
+    if (name.includes(ts[0])) return 2;
+    return 1;
+  };
+  const gather = ts => findIndex.map(it => ({ it, s: score(it, ts) })).filter(r => r.s > 0)
+    .sort((a, b) => b.s - a.s).slice(0, 40).map(r => r.it);
+  findMatches = gather(terms);
+  if (!findMatches.length) {
+    // clip each word back to its stem, so a plural or a past tense still lands
+    const stems = terms.map(t => t.length > 4 ? t.slice(0, Math.max(4, t.length - 2)) : t);
+    findMatches = gather(stems);
+  }
+  if (findIdx >= findMatches.length) findIdx = 0;
+  list.innerHTML = '';
+  if (!findMatches.length) {
+    const d = document.createElement('div');
+    d.className = 'fhit none';
+    d.textContent = 'Nothing matches \u201c' + q + '\u201d.';
+    list.appendChild(d);
+  }
+  findMatches.forEach((m, i) => {
+    const d = document.createElement('div');
+    d.className = 'fhit' + (i === findIdx ? ' on' : '');
+    const n = document.createElement('span');
+    n.textContent = m.name;
+    const w = document.createElement('span');
+    w.className = 'where';
+    w.textContent = m.where;
+    d.append(n, w);
+    d.onmouseenter = () => { findIdx = i; [...list.children].forEach((c, j) => c.classList.toggle('on', j === i)); };
+    d.onclick = () => findGo(i);
+    list.appendChild(d);
+  });
+  list.classList.add('open');
+}
+/* Getting there is the whole point: the control may be inside a folded
+   section, on a rail that focus mode hid, or below the fold. */
+function findGo(i) {
+  const m = findMatches[i];
+  if (!m) return;
+  const modal = m.el.closest('.modal');
+  if (modal && !modal.classList.contains('open')) {
+    if (modal.id === 'fx-modal') fxOpen();
+    else modal.classList.add('open');
+  }
+  const panel = m.el.closest('.wrap > .panel');
+  if (panel) {
+    const idx = [...document.querySelectorAll('.wrap > .panel')].indexOf(panel);
+    if (idx === 0 && !railState.left) { railState.left = true; railState.focusPrev = null; applyRails(); }
+    if (idx === 2 && !railState.right) { railState.right = true; railState.focusPrev = null; applyRails(); }
+  }
+  if (m.el.closest('#tl-head') && !railState.timeline) { railState.timeline = true; applyRails(); }
+  revealSection(m.el);
+  $('find').value = '';
+  $('find-list').classList.remove('open');
+  setTimeout(() => {
+    m.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    m.el.classList.add('findhit');
+    setTimeout(() => m.el.classList.remove('findhit'), 2400);
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(m.el.tagName) && m.el.type !== 'color') m.el.focus();
+  }, 60);
+}
+$('find').oninput = () => { findIdx = 0; findRender(); };
+$('find').onkeydown = e => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); findIdx = Math.min(findMatches.length - 1, findIdx + 1); findRender(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); findIdx = Math.max(0, findIdx - 1); findRender(); }
+  else if (e.key === 'Enter') { e.preventDefault(); findGo(findIdx); }
+  else if (e.key === 'Escape') { e.preventDefault(); $('find').value = ''; $('find-list').classList.remove('open'); $('find').blur(); }
+  e.stopPropagation();
+};
+$('find').onfocus = () => { if ($('find').value) findRender(); };
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('.finder')) $('find-list').classList.remove('open');
+}, true);
+
 /* ======================================================== pixel selection */
 /* Select and Copy have only ever worked on shapes, text and images. This is
    the same for painted pixels: mark a region, then move, erase, fill or lift
@@ -4414,6 +4599,7 @@ function applyRails() {
   w.classList.toggle('no-timeline', !railState.timeline);
   $('btn-rail-l').classList.toggle('on', railState.left);
   $('btn-rail-r').classList.toggle('on', railState.right);
+  $('btn-rail-t').classList.toggle('on', railState.timeline);
   const focused = !railState.left && !railState.right && !railState.timeline;
   $('btn-focus').classList.toggle('on', focused);
   try { localStorage.setItem('fs-rails', JSON.stringify({ l: railState.left, r: railState.right, t: railState.timeline })); } catch (_) {}
@@ -4440,6 +4626,7 @@ function toggleFocus() {
 }
 $('btn-rail-l').onclick = () => toggleRail('left');
 $('btn-rail-r').onclick = () => toggleRail('right');
+$('btn-rail-t').onclick = () => toggleRail('timeline');
 $('btn-focus').onclick = toggleFocus;
 try {
   const r = JSON.parse(localStorage.getItem('fs-rails') || 'null');
@@ -4786,6 +4973,7 @@ const COMMANDS = [
   { g: 'View', n: 'Fit canvas to the window', k: '0', r: () => { zoomIsFit = true; zoomFit(); } },
   { g: 'View', n: 'Actual size', k: '1', r: () => { zoomIsFit = false; setZoom(1); } },
   { g: 'View', n: 'Focus mode — hide the panels', k: 'Tab', r: toggleFocus },
+  { g: 'View', n: 'Find a tool or setting', k: '/', r: () => { $('find').focus(); } },
   { g: 'View', n: 'Show or hide the tool rail', r: () => toggleRail('left') },
   { g: 'View', n: 'Show or hide the properties rail', r: () => toggleRail('right') },
   { g: 'View', n: 'Show or hide the timeline', r: () => toggleRail('timeline') },
@@ -4971,6 +5159,7 @@ renderSwatches();
 renderRecents();
 renderBGPresets();
 initSections();
+buildFindIndex();
 try { setTimelineSize(+localStorage.getItem('fs-tlsize') || 84); } catch (_) { setTimelineSize(84); }
 applyRails();
 renderFonts('');
