@@ -57,7 +57,7 @@ canvas#view{display:block;width:100%;height:100%;touch-action:none;cursor:crossh
 .hint{color:var(--muted);font-size:12.5px;min-height:18px;text-align:center}
 .timeline{grid-column:1/-1;display:flex;gap:10px;overflow-x:auto;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);min-height:126px;align-items:flex-start}
 .fr{position:relative;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px}
-.fr canvas{width:84px;height:84px;border:2px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;display:block}
+.fr canvas{width:var(--tl,84px);height:var(--tl,84px);border:2px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;display:block}
 .fr.sel canvas{border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,141,255,.25)}
 .fr .lbl{font-size:11px;color:var(--muted)}
 .fr .ops{position:absolute;top:-6px;right:-6px;display:flex;gap:3px;opacity:0;transition:.12s}
@@ -117,6 +117,28 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   font-size:12px;line-height:1;cursor:pointer;border-radius:4px;flex:0 0 auto}
 .layer-row .mini:hover{background:#39415a}
 .layer-row .off{opacity:.38}
+/* ---- timeline header and status bar ---- */
+#tl-head{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:0 2px;font-size:12px;color:var(--muted)}
+#tl-head .ttl{font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:11px}
+#tl-head button{padding:2px 9px;line-height:1.1}
+#tl-head .readout{font-variant-numeric:tabular-nums;min-width:38px;text-align:center}
+#tl-head .hintish{margin-left:auto;opacity:.75}
+#statusbar{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:6px 10px;
+  font-size:11.5px;color:var(--muted);background:var(--panel);border:1px solid var(--line);
+  border-radius:var(--radius);font-variant-numeric:tabular-nums;overflow-x:auto;white-space:nowrap}
+#statusbar .grow{flex:1}
+#statusbar span:not(.grow){position:relative}
+#statusbar span:not(.grow)+span:not(.grow)::before{content:'';position:absolute;left:-8px;top:2px;bottom:2px;width:1px;background:var(--line)}
+
+/* ---- right-click frame menu ---- */
+.ctxmenu{position:fixed;z-index:90;min-width:206px;padding:5px;border-radius:10px;
+  background:var(--panel);border:1px solid var(--line);box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.ctxmenu button{display:flex;width:100%;justify-content:flex-start;gap:8px;background:none;
+  border:none;padding:7px 10px;border-radius:6px;font-size:13px;text-align:left}
+.ctxmenu button:hover{background:var(--panel2)}
+.ctxmenu button.danger{color:#ff9d9d}
+.ctxmenu hr{border:none;border-top:1px solid var(--line);margin:4px 6px}
+
 /* ---- collapsible sections ----
    Every panel section is now a disclosure: the h3 is its handle, and the
    open/closed state is remembered per section so the cockpit you set up
@@ -232,7 +254,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
   .panel{padding:10px}
   .viewport{max-height:52vh;min-height:220px}
   .timeline{min-height:104px;padding:10px}
-  .fr canvas{width:64px;height:64px}
+  .fr canvas{width:var(--tl,64px);height:var(--tl,64px)}
   .keys{font-size:11px;line-height:1.8}
 }
 @media (pointer:coarse){
@@ -587,7 +609,25 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     </div>
   </div>
 
+  <div id="tl-head">
+    <span class="ttl">🎞️ Timeline</span>
+    <button id="tl-out" title="Smaller thumbnails">−</button>
+    <span class="readout" id="tl-zoom">84px</span>
+    <button id="tl-in" title="Bigger thumbnails">+</button>
+    <span class="hintish">Drag a frame to reorder · right-click for more</span>
+  </div>
   <div class="timeline" id="timeline"></div>
+  <div id="statusbar">
+    <span id="st-frame">Frame 1 / 1</span>
+    <span id="st-size">500 × 500</span>
+    <span id="st-fps">8.3 fps</span>
+    <span id="st-len">0.12s</span>
+    <span id="st-layers">1 layer</span>
+    <span id="st-zoom">100%</span>
+    <span id="st-tool">Brush</span>
+    <span class="grow"></span>
+    <span id="st-export">—</span>
+  </div>
 </div>
 
 <input type="file" id="file-img" accept="image/*,.gif" multiple hidden>
@@ -969,6 +1009,7 @@ function applyZoom() {
   shell.style.width = Math.round(W * zoom) + 'px';
   shell.style.height = Math.round(H * zoom) + 'px';
   $('zoom-val').textContent = Math.round(zoom * 100) + '%';
+  updateStatus();
   $('canvas-dims').textContent = W + ' \u00d7 ' + H + ' px';
   repaint();
 }
@@ -1090,7 +1131,7 @@ function renderTimeline() {
   frames.forEach((f, i) => {
     const box = document.createElement('div');
     box.className = 'fr' + (i === cur ? ' sel' : '');
-    const t = makeCanvas(84, 84);
+    const t = makeCanvas(tlSize, tlSize);
     t.title = 'Frame ' + (i + 1);
     t.onclick = () => selectFrame(i);
     const lbl = document.createElement('span');
@@ -1138,6 +1179,7 @@ function renderTimeline() {
       box.classList.add('over');
     };
     box.ondragleave = () => box.classList.remove('over');
+    box.oncontextmenu = e => { e.preventDefault(); openFrameMenu(e, i); };
     box.ondrop = e => {
       e.preventDefault();
       box.classList.remove('over');
@@ -1158,14 +1200,15 @@ function mkOp(txt, title, fn) {
 function drawThumb(i) {
   const f = frames[i];
   if (!f || !f.thumb) return;
+  const z = f.thumb.width;
   const c = f.thumb.getContext('2d');
   c.setTransform(1, 0, 0, 1, 0, 0);
-  c.clearRect(0, 0, 84, 84);
+  c.clearRect(0, 0, z, z);
   c.fillStyle = $('bg-transparent').checked ? '#ffffff' : $('bg-color').value;
-  c.fillRect(0, 0, 84, 84);
-  const s = Math.min(84 / W, 84 / H);
+  c.fillRect(0, 0, z, z);
+  const s = Math.min(z / W, z / H);
   c.save();
-  c.translate((84 - W * s) / 2, (84 - H * s) / 2);
+  c.translate((z - W * s) / 2, (z - H * s) / 2);
   c.scale(s, s);
   renderFrame(c, f);
   c.restore();
@@ -1184,6 +1227,7 @@ function refreshAll() {
   renderLayers();
   syncSelPanel();
   updateAnimInfo();
+  updateStatus();
 }
 function updateAnimInfo() {
   const ms = frames.reduce((n, f) => n + f.delay, 0);
@@ -1544,6 +1588,7 @@ function setTool(t, sh) {
     stamp: 'Stamp (' + sh + ') — click, or drag to set the size.'
   };
   $('hint').textContent = msgs[sh ? 'stamp' : t] || '';
+  updateStatus();
   view.style.cursor = t === 'crop' ? 'crosshair'
     : t === 'pan' ? 'grab'
     : t === 'select' ? 'default'
@@ -2400,6 +2445,7 @@ function progress(v, msg) {
   if (msg) $('hint').textContent = msg;
 }
 function download(blob, name) {
+  noteExport(name, blob.size);          // the status bar reports what last left the app
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = name;
@@ -3820,6 +3866,82 @@ function setLayerShared(on) {
   renderTimeline(); refreshAll();
 }
 
+/* ============================================== timeline zoom & status bar */
+let tlSize = 84;
+function setTimelineSize(px) {
+  tlSize = Math.max(44, Math.min(180, Math.round(px)));
+  document.documentElement.style.setProperty('--tl', tlSize + 'px');
+  $('tl-zoom').textContent = tlSize + 'px';
+  try { localStorage.setItem('fs-tlsize', tlSize); } catch (_) {}
+  renderTimeline();                       // thumbnails are redrawn at the new resolution
+}
+const TOOL_NAMES = { select: 'Select', brush: 'Brush', eraser: 'Eraser', line: 'Line', rect: 'Rectangle',
+  ellipse: 'Ellipse', fill: 'Fill', text: 'Text', eyedrop: 'Picker', spray: 'Spray', smudge: 'Smudge',
+  pan: 'Pan', crop: 'Crop', stamp: 'Stamp' };
+function updateStatus() {
+  if (!frames.length) return;
+  const ms = frames.reduce((n, f) => n + f.delay, 0);
+  const fps = ms ? frames.length / (ms / 1000) : 0;
+  const layers = F().layers.length;
+  const shared = F().layers.filter(l => l.shared).length;
+  $('st-frame').textContent = 'Frame ' + (cur + 1) + ' / ' + frames.length;
+  $('st-size').textContent = W + ' \u00d7 ' + H;
+  $('st-fps').textContent = fps.toFixed(1) + ' fps';
+  $('st-len').textContent = (ms / 1000).toFixed(2) + 's';
+  $('st-layers').textContent = layers + (layers === 1 ? ' layer' : ' layers') + (shared ? ' (' + shared + ' shared)' : '');
+  $('st-zoom').textContent = Math.round(zoom * 100) + '%';
+  $('st-tool').textContent = shape ? 'Stamp: ' + shape : (TOOL_NAMES[tool] || tool);
+}
+function noteExport(name, bytes) {
+  $('st-export').textContent = 'Last export: ' + name + ' \u00b7 ' +
+    (bytes > 1048576 ? (bytes / 1048576).toFixed(2) + ' MB' : (bytes / 1024).toFixed(0) + ' KB');
+}
+
+/* ======================================================= frame right-click */
+let ctxMenu = null;
+function closeFrameMenu() {
+  if (ctxMenu) { ctxMenu.remove(); ctxMenu = null; }
+}
+function openFrameMenu(e, i) {
+  closeFrameMenu();
+  const m = document.createElement('div');
+  m.className = 'ctxmenu';
+  const add = (label, fn, cls) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (cls) b.className = cls;
+    b.onclick = () => { closeFrameMenu(); fn(); };
+    m.appendChild(b);
+  };
+  const sep = () => m.appendChild(document.createElement('hr'));
+  add('\u25B6 Go to this frame', () => selectFrame(i));
+  add('\u29C9 Duplicate', () => { selectFrame(i); duplicateFrame(); });
+  add('\u2795 Insert blank frame after', () => { selectFrame(i); addFrame(); });
+  sep();
+  add('\u25C0 Move left', () => moveFrame(i, -1));
+  add('\u25B6 Move right', () => moveFrame(i, 1));
+  sep();
+  add('\u21D4 Copy this layer to every frame', () => { selectFrame(i); copyFrameToAll(); });
+  add('\u2194 Give every frame this delay', () => {
+    const d = frames[i].delay;
+    pushStruct();
+    frames.forEach(f => f.delay = d);
+    dirty = true; refreshAll();
+    toast('Every frame now waits ' + d + 'ms.');
+  });
+  sep();
+  add('\u{1F5D1} Delete frame', () => deleteFrame(i), 'danger');
+  document.body.appendChild(m);
+  // keep the menu on screen when the click lands near an edge
+  const r = m.getBoundingClientRect();
+  m.style.left = Math.min(e.clientX, window.innerWidth - r.width - 8) + 'px';
+  m.style.top = Math.min(e.clientY, window.innerHeight - r.height - 8) + 'px';
+  ctxMenu = m;
+}
+window.addEventListener('pointerdown', e => { if (ctxMenu && !ctxMenu.contains(e.target)) closeFrameMenu(); }, true);
+window.addEventListener('keydown', e => { if (e.key === 'Escape') closeFrameMenu(); }, true);
+window.addEventListener('blur', closeFrameMenu);
+
 /* =================================================== collapsible sections */
 /* The panels carry a lot of controls. Making every section a disclosure lets
    you fold away the ones this project does not need, and the choice is
@@ -3977,6 +4099,8 @@ const COMMANDS = [
   { g: 'Frame', n: 'Next frame', k: '.', r: () => selectFrame(cur + 1) },
   { g: 'Frame', n: 'Previous frame', k: ',', r: () => selectFrame(cur - 1) },
   { g: 'Frame', n: 'Reverse frame order', r: reverseFrames },
+  { g: 'View', n: 'Bigger timeline thumbnails', r: () => setTimelineSize(tlSize + 14) },
+  { g: 'View', n: 'Smaller timeline thumbnails', r: () => setTimelineSize(tlSize - 14) },
   { g: 'Frame', n: 'Ping-pong (bounce) the animation', r: pingPong },
   { g: 'Frame', n: 'Tween into the next frame', r: () => tween(Math.max(1, Math.min(60, +$('tween-n').value || 4))) },
   { g: 'Frame', n: 'Play / stop', k: 'Space', r: togglePlay },
@@ -4124,6 +4248,8 @@ $('lay-share').onclick = () => setLayerShared(!L().shared);
 $('sel-tonext').onclick = () => copySelToFrames('next');
 $('sel-toall').onclick = () => copySelToFrames('all');
 $('sel-fit').onclick = fitSelToCanvas;
+$('tl-in').onclick = () => setTimelineSize(tlSize + 14);
+$('tl-out').onclick = () => setTimelineSize(tlSize - 14);
 $('btn-reverse').onclick = reverseFrames;
 $('btn-pingpong').onclick = pingPong;
 $('btn-theme').onclick = () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light');
@@ -4164,6 +4290,7 @@ try { setTheme(localStorage.getItem('fs-theme') || 'dark'); } catch (_) { setThe
 renderSwatches();
 renderRecents();
 initSections();
+try { setTimelineSize(+localStorage.getItem('fs-tlsize') || 84); } catch (_) { setTimelineSize(84); }
 renderFonts('');
 renderTimeline();
 updateHistoryButtons();
