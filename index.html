@@ -416,6 +416,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <label class="row">Fill tolerance <span id="tol-val" style="color:var(--text)">24</span></label>
       <input type="range" id="tol" min="0" max="160" value="24" title="How different a pixel may be and still count as the same colour, for both Fill and the Wand">
       <label class="row">Wand: contiguous only <input type="checkbox" id="wand-contig" checked title="On: only the patch you click. Off: every matching pixel on the layer."></label>
+      <label class="row">Wand: any colour <input type="checkbox" id="wand-opaque" title="Grab the whole drawn shape whatever colours are in it, rather than matching one colour. Shift-click does the same."></label>
       <h4>Edit</h4>
       <div class="grid2">
         <button data-tool="marquee" title="Select a rectangle of pixels — M">▭ Marquee<span class="k">M</span></button>
@@ -1788,7 +1789,7 @@ function setTool(t, sh) {
     text: 'Text — click the canvas to place your text.', eyedrop: 'Picker — click to sample a colour.',
     marquee: 'Marquee — drag out a rectangle of pixels. Drag inside it to move them.',
     lasso: 'Lasso — draw around the pixels you want. Drag inside to move them.',
-    wand: 'Wand — click a colour to select it. Fill tolerance sets how close a match must be.',
+    wand: 'Wand — click a colour to select it. Shift-click grabs the whole drawn shape whatever colours are in it.',
     spray: 'Airbrush — hold and move. Size sets the spread, opacity the density.',
     smudge: 'Smudge — drag to pull colour along. Opacity sets the strength.',
     pan: 'Pan - drag to move around the canvas. Ctrl+wheel zooms.',
@@ -2006,7 +2007,7 @@ view.addEventListener('pointerdown', e => {
       return;
     }
     dropPixels();
-    if (tool === 'wand') { setPixSelMask(null); wandSelect(p); return; }
+    if (tool === 'wand') { wandAnyColour = e.shiftKey; setPixSelMask(null); wandSelect(p); wandAnyColour = false; return; }
     drawing = true; mode = 'pixdraw';
     grab = { x: p.x, y: p.y, pts: [{ x: p.x, y: p.y }] };
     setPixSelMask(null);
@@ -4569,6 +4570,7 @@ function pixInvert() {
 /* Select by colour rather than by shape. Contiguous walks outward from the
    pixel you clicked; the alternative takes every matching pixel on the
    layer, which is how you catch every instance of one colour at once. */
+let wandAnyColour = false;      // set by a shift-click, as a shortcut for the checkbox
 function wandSelect(p) {
   const img = fctx().getImageData(0, 0, W, H);
   const d = img.data;
@@ -4578,13 +4580,21 @@ function wandSelect(p) {
   const tr = d[s], tg = d[s + 1], tb = d[s + 2], ta = d[s + 3];
   const t0 = Math.max(0, +$('tol').value || 0);
   const tol = t0 * t0 * 4;
-  const match = k => {
-    const j = k * 4;
-    // two fully transparent pixels are the same colour whatever their RGB says
-    if (ta < 8 && d[j + 3] < 8) return true;
-    const dr = d[j] - tr, dg = d[j + 1] - tg, db = d[j + 2] - tb, da = d[j + 3] - ta;
-    return dr * dr + dg * dg + db * db + da * da <= tol;
-  };
+  /* A brush stroke is rarely one flat colour - it is shaded, blended, and
+     soft at the edges. Matching on "is anything painted here" grabs the whole
+     drawn shape, which is what you want when the goal is to copy the drawing
+     rather than to recolour one tone. */
+  const anyColour = $('wand-opaque').checked || wandAnyColour;
+  const match = anyColour
+    ? k => d[k * 4 + 3] > 16
+    : k => {
+        const j = k * 4;
+        // two fully transparent pixels are the same colour whatever their RGB says
+        if (ta < 8 && d[j + 3] < 8) return true;
+        const dr = d[j] - tr, dg = d[j + 1] - tg, db = d[j + 2] - tb, da = d[j + 3] - ta;
+        return dr * dr + dg * dg + db * db + da * da <= tol;
+      };
+  if (anyColour && ta <= 16) { toast('Nothing is drawn there — click on the artwork.', 'bad'); return; }
   const mask = new Uint8Array(W * H);
   if (!$('wand-contig').checked) {
     for (let k = 0; k < mask.length; k++) if (match(k)) mask[k] = 1;
@@ -4613,7 +4623,7 @@ function wandSelect(p) {
   let n = 0;
   for (let k = 0; k < mask.length; k++) if (mask[k]) n++;
   if (!n) { toast('Nothing on this layer matches that pixel.', 'bad'); return; }
-  setPixSelMask(mask, $('wand-contig').checked ? 'Wand' : 'Wand (whole layer)');
+  setPixSelMask(mask, (anyColour ? 'Shape' : 'Wand') + ($('wand-contig').checked ? '' : ' (whole layer)'));
 }
 
 $('pix-none').onclick = () => { dropPixels(); setPixSelMask(null); };
