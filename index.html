@@ -483,10 +483,17 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <button id="sel-reset" title="Reset rotation">↺ 0°</button>
         <button id="sel-del" class="danger" title="Delete (Del)">🗑️ Delete</button>
       </div>
-      <div class="grid2" style="margin-top:6px">
-        <button id="sel-continue" class="green" title="Carry on the movement of the last three frames into new ones">↝ Continue motion</button>
-        <input type="number" id="continue-n" value="4" min="1" max="60" title="How many frames to carry it on for">
-      </div>
+      <button id="sel-continue" class="green" style="width:100%;margin-top:6px" title="Carry on the movement of the last three frames into new ones">↝ Continue motion</button>
+      <label class="row">Direction <select id="cont-dir" style="width:118px" title="Auto follows the path it is already on, curve and all. The rest force a straight axis.">
+        <option value="auto">Auto (as drawn)</option>
+        <option value="right">→ Right</option>
+        <option value="left">← Left</option>
+        <option value="down">↓ Down</option>
+        <option value="up">↑ Up</option>
+      </select></label>
+      <label class="row">Steps <input type="number" id="continue-n" value="4" min="1" max="60" style="width:70px" title="How many movements to add"></label>
+      <label class="row">Gap <input type="number" id="cont-step" min="0" max="600" placeholder="auto" style="width:70px" title="Pixels between one step and the next. Leave empty to keep the speed it is already going."></label>
+      <label class="row">Frames each <input type="number" id="cont-hold" value="1" min="1" max="12" style="width:70px" title="How many frames each step lasts. 1 means it moves every frame."></label>
       <div class="grid2" style="margin-top:6px">
         <button id="sel-tonext" title="Put a copy of this on the next frame">→ Next frame</button>
         <button id="sel-toall" title="Put a copy of this on every other frame, in the same place">⧉ All frames</button>
@@ -818,6 +825,17 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <div class="wfoot">
       <label><input type="checkbox" id="w-skip"> Skip this next time</label>
       <button id="w-close">Straight to the editor →</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="confirm">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Confirm" style="width:min(400px,100%)">
+    <h2 id="confirm-title">Are you sure?</h2>
+    <p class="sub" id="confirm-body"></p>
+    <div class="foot">
+      <button id="confirm-no">Cancel</button>
+      <button id="confirm-yes" class="danger">Delete</button>
     </div>
   </div>
 </div>
@@ -1481,8 +1499,14 @@ function duplicateFrame() {
   cur++; sel = -1; dirty = true;
   renderTimeline(); refreshAll();
 }
-function deleteFrame(i) {
+function deleteFrame(i, confirmed) {
   if (frames.length <= 1) { toast('A project needs at least one frame.', 'bad'); return; }
+  if (!confirmed && frames[i] && !frameIsEmpty(frames[i])) {
+    askConfirm('Delete frame ' + (i + 1) + '?',
+      'There is artwork on it. Ctrl+Z will bring it back if you change your mind.',
+      'Delete frame', () => deleteFrame(i, true));
+    return;
+  }
   stopPlay();
   pushStruct();
   frames.splice(i, 1);
@@ -4668,6 +4692,39 @@ $('pix-copy').onclick = pixCopy;
 $('pix-crop').onclick = pixCrop;
 $('pix-invert').onclick = pixInvert;
 
+/* ================================================================ confirm */
+let confirmCb = null;
+function askConfirm(title, body, yesLabel, onYes) {
+  confirmCb = onYes;
+  $('confirm-title').textContent = title;
+  $('confirm-body').textContent = body;
+  $('confirm-yes').textContent = yesLabel || 'Delete';
+  $('confirm').classList.add('open');
+  setTimeout(() => $('confirm-no').focus(), 30);
+}
+function closeConfirm() { confirmCb = null; $('confirm').classList.remove('open'); }
+$('confirm-no').onclick = closeConfirm;
+$('confirm-yes').onclick = () => { const fn = confirmCb; closeConfirm(); if (fn) fn(); };
+$('confirm').onclick = e => { if (e.target.id === 'confirm') closeConfirm(); };
+/* Cheap emptiness test: draw the frame small and look for any opaque pixel.
+   A blank frame is not worth a dialog, and nagging about those is how people
+   learn to click through dialogs without reading them. */
+let emptyProbe = null;
+function frameIsEmpty(f) {
+  if (f.layers.some(l => l.objs.length)) return false;
+  if (!emptyProbe) emptyProbe = makeCanvas(64, 64, true);
+  const c = emptyProbe.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, 64, 64);
+  c.save();
+  c.scale(64 / W, 64 / H);
+  renderFrame(c, f);
+  c.restore();
+  const d = c.getImageData(0, 0, 64, 64).data;
+  for (let i = 3; i < d.length; i += 4) if (d[i] > 8) return false;
+  return true;
+}
+
 /* ====================================================== continue a motion */
 /* Once something has been moved across three frames there is enough evidence
    to say where it was going, so the app can keep it going. Two steps give a
@@ -4738,37 +4795,62 @@ function continueMotion(count) {
   turn = Math.max(-0.6, Math.min(0.6, turn));
   accel = Math.max(0.6, Math.min(1.6, accel));
 
+  /* Direction, spacing and hold are overrides on top of what was measured.
+     Forcing an axis also drops the turn and the acceleration: you asked for a
+     straight line, so a straight line is what you get. */
+  const dir = $('cont-dir').value;
+  const gap = Math.max(0, +$('cont-step').value || 0);
+  const hold = Math.max(1, Math.min(12, +$('cont-hold').value || 1));
+  let vx = last.x, vy = last.y;
+  if (dir !== 'auto') {
+    const along = gap || Math.abs(dir === 'left' || dir === 'right' ? last.x : last.y) ||
+                  Math.hypot(last.x, last.y) || 20;
+    vx = dir === 'right' ? along : dir === 'left' ? -along : 0;
+    vy = dir === 'down' ? along : dir === 'up' ? -along : 0;
+    turn = 0; accel = 1;
+  } else if (gap) {
+    const len = Math.hypot(vx, vy) || 1;       // keep the heading, set the stride
+    vx = vx / len * gap; vy = vy / len * gap;
+    accel = 1;
+  }
+
   stopPlay();
   pushStruct();
   const n = Math.max(1, Math.min(60, count || 4));
-  let vx = last.x, vy = last.y;
   let src = frames[cur];
   const made = [];
   for (let i = 0; i < n; i++) {
     const nx = vx * Math.cos(turn) - vy * Math.sin(turn);
     const ny = vx * Math.sin(turn) + vy * Math.cos(turn);
     vx = nx * accel; vy = ny * accel;
-    const f = { layers: src.layers.map(l => copyLayerForFrame(l, true)), active: src.active, delay: src.delay };
-    const hit = findObjInFrame(f, o.id);
-    if (!hit) break;
-    const q = hit.obj;
-    q.x += vx; q.y += vy;
-    if (last.rot) q.rot = (q.rot || 0) + last.rot;
-    if (last.w) q.w = Math.max(4, (q.w || 0) + last.w);
-    if (last.h) q.h = Math.max(4, (q.h || 0) + last.h);
-    if (last.size && q.type === 'text') { q.size = Math.max(6, q.size + last.size); measureObj(q); }
-    if (last.alpha) q.alpha = Math.max(0.05, Math.min(1, (q.alpha != null ? q.alpha : 1) + last.alpha));
-    made.push(f);
-    src = f;
+    for (let h = 0; h < hold; h++) {
+      const f = { layers: src.layers.map(l => copyLayerForFrame(l, true)), active: src.active, delay: src.delay };
+      const hit = findObjInFrame(f, o.id);
+      if (!hit) break;
+      // it moves on the first frame of the step and then sits still for the rest
+      if (h === 0) {
+        const q = hit.obj;
+        q.x += vx; q.y += vy;
+        if (last.rot) q.rot = (q.rot || 0) + last.rot;
+        if (last.w) q.w = Math.max(4, (q.w || 0) + last.w);
+        if (last.h) q.h = Math.max(4, (q.h || 0) + last.h);
+        if (last.size && q.type === 'text') { q.size = Math.max(6, q.size + last.size); measureObj(q); }
+        if (last.alpha) q.alpha = Math.max(0.05, Math.min(1, (q.alpha != null ? q.alpha : 1) + last.alpha));
+      }
+      made.push(f);
+      src = f;
+    }
   }
   if (!made.length) { undoStack.pop(); updateHistoryButtons(); toast('Could not carry that one on.', 'bad'); return; }
   frames.splice(cur + 1, 0, ...made);
   cur += made.length;
   dirty = true;
   renderTimeline(); refreshAll();
-  const shape = Math.abs(turn) > 0.05 ? 'curve' : 'line';
-  toast('Added ' + made.length + (made.length === 1 ? ' frame' : ' frames') +
-        ' carrying on the ' + shape + ' at ' + Math.round(Math.hypot(last.x, last.y)) + 'px a frame' +
+  const shape = dir !== 'auto' ? dir : (Math.abs(turn) > 0.05 ? 'curve' : 'line');
+  const stride = Math.round(Math.hypot(vx, vy));
+  toast('Added ' + made.length + (made.length === 1 ? ' frame' : ' frames') + ' — ' + n +
+        (n === 1 ? ' step ' : ' steps ') + shape + ', ' + stride + 'px apart' +
+        (hold > 1 ? ', holding ' + hold + ' frames each' : '') +
         (accel > 1.05 ? ', speeding up' : accel < 0.95 ? ', slowing down' : '') + '.', 'good');
 }
 $('sel-continue').onclick = () => continueMotion(+$('continue-n').value || 4);
@@ -5469,6 +5551,7 @@ window.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && k === 's') { e.preventDefault(); saveProject(); return; }
   if ((e.ctrlKey || e.metaKey) && k === 'e') { e.preventDefault(); $('btn-export').click(); return; }
   if (e.key === 'Escape') {
+    if ($('confirm').classList.contains('open')) { closeConfirm(); return; }
     if ($('welcome').classList.contains('open')) { closeWelcome(); return; }
     if ($('cmdk').classList.contains('open')) { cmdClose(); return; }
     if ($('fx-modal').classList.contains('open')) { fxClose(); return; }
