@@ -23,7 +23,7 @@ header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:
 header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.2px}
 header .spacer{flex:1}
 .badge{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:2px 8px;border-radius:99px}
-.wrap{display:grid;grid-template-columns:270px minmax(0,1fr) 230px;gap:12px;padding:12px;align-items:start}
+.wrap{display:grid;grid-template-columns:54px 250px minmax(0,1fr) 230px;gap:12px;padding:12px;align-items:start}
 @media(max-width:1100px){.wrap{grid-template-columns:minmax(0,1fr)}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:12px;min-width:0}
 .panel h3{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
@@ -121,22 +121,49 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
    The columns collapse to zero and the grid re-solves, which hands every
    pixel they were using to the viewport. */
 @media(min-width:1101px){
-  /* Pin each panel to its own column. Without this, hiding a rail removes it
-     from the flow and the remaining panels auto-place one column to the left -
-     the canvas lands in the collapsed 0px track and disappears. */
-  .wrap > .panel:nth-of-type(1){grid-column:1;grid-row:1}
-  .wrap > .panel:nth-of-type(2){grid-column:2;grid-row:1}
-  .wrap > .panel:nth-of-type(3){grid-column:3;grid-row:1}
-  .wrap.no-left{grid-template-columns:0 minmax(0,1fr) 230px}
-  .wrap.no-right{grid-template-columns:270px minmax(0,1fr) 0}
-  .wrap.no-left.no-right{grid-template-columns:0 minmax(0,1fr) 0}
-  .wrap.no-left > .panel:nth-of-type(1),
-  .wrap.no-right > .panel:nth-of-type(3){display:none}
-  .wrap.no-timeline #tl-head,.wrap.no-timeline .timeline{display:none}
+  /* Pin every column by identity. Hiding one takes it out of the flow, and
+     auto-placement would then slide the rest one column left - which once put
+     the canvas in a collapsed 0px track and made it vanish. */
+  #rail-tools{grid-column:1;grid-row:1}
+  .wrap > .panel.opts{grid-column:2;grid-row:1}
+  .wrap > .panel.stage{grid-column:3;grid-row:1}
+  .wrap > .panel.props{grid-column:4;grid-row:1}
+  .wrap.no-left{grid-template-columns:54px 0 minmax(0,1fr) 230px}
+  .wrap.no-right{grid-template-columns:54px 250px minmax(0,1fr) 0}
+  .wrap.no-left.no-right{grid-template-columns:54px 0 minmax(0,1fr) 0}
+  .wrap.no-rail{grid-template-columns:0 250px minmax(0,1fr) 230px}
+  .wrap.no-rail.no-left{grid-template-columns:0 0 minmax(0,1fr) 230px}
+  .wrap.no-rail.no-right{grid-template-columns:0 250px minmax(0,1fr) 0}
+  .wrap.no-rail.no-left.no-right{grid-template-columns:0 0 minmax(0,1fr) 0}
 }
-.wrap.no-left > .panel:nth-of-type(1),
-.wrap.no-right > .panel:nth-of-type(3){display:none}
+.wrap.no-left > .panel.opts,
+.wrap.no-right > .panel.props,
+.wrap.no-rail > #rail-tools{display:none}
 .wrap.no-timeline #tl-head,.wrap.no-timeline .timeline{display:none}
+
+/* ---- the tool rail ---- */
+#rail-tools{display:flex;flex-direction:column;gap:4px;padding:6px 5px;min-width:0;
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:auto}
+#rail-tools button{position:relative;width:100%;height:40px;padding:0;border-radius:8px;
+  display:flex;align-items:center;justify-content:center}
+#rail-tools button i{font-style:normal;font-size:18px;line-height:1}
+#rail-tools button em{position:absolute;right:3px;bottom:2px;font-style:normal;font-size:8.5px;
+  opacity:.5;font-family:ui-monospace,Consolas,monospace}
+#rail-tools button.on em{opacity:.85}
+#rail-tools hr{width:60%;border:none;border-top:1px solid var(--line);margin:3px auto}
+@media(max-width:1100px){
+  #rail-tools{flex-direction:row;flex-wrap:wrap;overflow:visible}
+  #rail-tools button{width:44px}
+  #rail-tools hr{display:none}
+}
+
+/* ---- the canvas is the subject, so the panel around it stops competing ---- */
+.wrap > .panel.stage{background:none;border:none;padding:0;gap:8px}
+.stage .viewport{background:var(--stagebg,#080a0e);box-shadow:none;
+  border:1px solid var(--line)}
+.canvas-shell{box-shadow:0 20px 50px rgba(0,0,0,.5)}
+html[data-theme="light"] .stage .viewport{--stagebg:#dbe0e9}
+.stage .toolbar,.stage .zoombar,.stage .scrubrow,.stage .hint{padding:0 2px}
 
 #pixsel-bar{display:none;align-items:center;gap:8px;width:100%;padding:8px 10px;font-size:12.5px;
   background:var(--panel2);border:1px solid var(--line);border-radius:8px;flex-wrap:wrap}
@@ -169,6 +196,21 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .scrubrow input[type=range]{flex:1}
 .scrubrow .readout{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px;min-width:52px;text-align:right}
 @media (pointer:coarse){ .scrubrow input[type=range]{height:30px} }
+
+.pname{font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:99px;cursor:pointer;
+  border:1px dashed transparent;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pname:hover{border-color:var(--line);background:var(--panel2)}
+#proj-list{display:flex;flex-direction:column;gap:6px;max-height:52vh;overflow:auto}
+.prow{display:flex;align-items:center;gap:10px;padding:7px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--line);background:var(--panel2)}
+.prow:hover{border-color:var(--accent)}
+.prow.current{border-color:var(--good)}
+.prow img{width:46px;height:46px;border-radius:6px;object-fit:cover;background:#fff;flex:0 0 auto}
+.prow .meta{display:flex;flex-direction:column;min-width:0;flex:1}
+.prow .meta b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow .meta span{font-size:11px;color:var(--muted)}
+.prow .pops{display:flex;gap:4px;flex:0 0 auto}
+.prow .pops button{padding:5px 9px;font-size:12px}
 
 /* ---- brand ---- */
 .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:inherit;flex:0 0 auto}
@@ -375,9 +417,12 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <input type="text" id="find" placeholder="🔎 Find a tool or setting…  ( / )" autocomplete="off" spellcheck="false">
     <div id="find-list"></div>
   </div>
+  <button id="btn-projects" title="Every project you have saved">🗂️ Projects</button>
+  <span class="pname" id="proj-name" title="Click to rename this project">Untitled</span>
   <span class="saving" id="save-state"></span>
   <div class="spacer"></div>
-  <button id="btn-rail-l" class="on" title="Show or hide the tool rail">◧</button>
+  <button id="btn-rail-k" class="on" title="Show or hide the tool menu">🧰</button>
+  <button id="btn-rail-l" class="on" title="Show or hide the tool options">◧</button>
   <button id="btn-rail-r" class="on" title="Show or hide the properties rail">◨</button>
   <button id="btn-rail-t" class="on" title="Show or hide the timeline">▤</button>
   <button id="btn-focus" title="Focus mode — hide both rails and the timeline (Tab)">⛶ Focus</button>
@@ -400,44 +445,45 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
 
 <div class="wrap">
 
+  <!-- TOOL RAIL -->
+  <nav id="rail-tools" aria-label="Tools">
+    <button data-tool="brush" class="on" title="Brush — B"><i>🖌️</i><em>B</em></button>
+    <button data-tool="eraser" title="Eraser — E"><i>🧽</i><em>E</em></button>
+    <button data-tool="spray" title="Airbrush — A"><i>💨</i><em>A</em></button>
+    <button data-tool="smudge" title="Smudge — S"><i>👉</i><em>S</em></button>
+    <button data-tool="fill" title="Flood fill — G"><i>🪣</i><em>G</em></button>
+    <hr>
+    <button data-tool="line" title="Line — L"><i>📏</i><em>L</em></button>
+    <button data-tool="rect" title="Rectangle — R"><i>▭</i><em>R</em></button>
+    <button data-tool="ellipse" title="Ellipse — O"><i>◯</i><em>O</em></button>
+    <button data-tool="text" title="Text — T"><i>🔤</i><em>T</em></button>
+    <hr>
+    <button data-tool="select" title="Select, move, resize and rotate — V"><i>🖱️</i><em>V</em></button>
+    <button data-tool="marquee" title="Select a rectangle of pixels — M"><i>▭</i><em>M</em></button>
+    <button data-tool="lasso" title="Freehand pixel selection — Q"><i>✎</i><em>Q</em></button>
+    <button data-tool="wand" title="Select every pixel of a similar colour — W"><i>🪄</i><em>W</em></button>
+    <hr>
+    <button data-tool="eyedrop" title="Colour picker — I"><i>💧</i><em>I</em></button>
+    <button data-tool="crop" title="Crop the canvas — C"><i>✂</i><em>C</em></button>
+    <button data-tool="pan" title="Pan the canvas — H"><i>✋</i><em>H</em></button>
+  </nav>
+
   <!-- LEFT -->
-  <div class="panel">
+  <div class="panel opts">
     <div class="sec" id="tools">
-      <h3>🎨 Tools</h3>
-      <h4>Draw</h4>
-      <div class="grid2">
-        <button data-tool="brush" class="on" title="Brush — B">🖌️ Brush<span class="k">B</span></button>
-        <button data-tool="eraser" title="Eraser — E">🧽 Eraser<span class="k">E</span></button>
-        <button data-tool="line" title="Line — L">📏 Line<span class="k">L</span></button>
-        <button data-tool="rect" title="Rectangle — R">▭ Rect<span class="k">R</span></button>
-        <button data-tool="ellipse" title="Ellipse — O">◯ Ellipse<span class="k">O</span></button>
-        <button data-tool="fill" title="Flood fill — G">🪣 Fill<span class="k">G</span></button>
-        <button data-tool="text" title="Text — T">🔤 Text<span class="k">T</span></button>
-        <button data-tool="eyedrop" title="Colour picker — I">💧 Pick<span class="k">I</span></button>
-        <button data-tool="spray" title="Airbrush — A">💨 Spray<span class="k">A</span></button>
-        <button data-tool="smudge" title="Smudge — S">👉 Smudge<span class="k">S</span></button>
-      </div>
-      <label class="row" style="margin-top:10px">Smoothing <span id="smooth-val" style="color:var(--text)">0%</span></label>
+      <h3>🎨 Tool options</h3>
+      <label class="row" style="margin-top:2px">Smoothing <span id="smooth-val" style="color:var(--text)">0%</span></label>
       <input type="range" id="smooth" min="0" max="90" value="0" title="Steadies a shaky hand on brush and eraser strokes">
       <label class="row">Fill tolerance <span id="tol-val" style="color:var(--text)">24</span></label>
       <input type="range" id="tol" min="0" max="160" value="24" title="How different a pixel may be and still count as the same colour, for both Fill and the Wand">
       <label class="row">Wand: contiguous only <input type="checkbox" id="wand-contig" checked title="On: only the patch you click. Off: every matching pixel on the layer."></label>
       <label class="row">Wand: any colour <input type="checkbox" id="wand-opaque" title="Grab the whole drawn shape whatever colours are in it, rather than matching one colour. Shift-click does the same."></label>
-      <h4>Edit</h4>
+      <h4>Actions</h4>
       <div class="grid2">
-        <button data-tool="marquee" title="Select a rectangle of pixels — M">▭ Marquee<span class="k">M</span></button>
-        <button data-tool="lasso" title="Draw a freehand pixel selection — Q">✎ Lasso<span class="k">Q</span></button>
-        <button data-tool="wand" title="Select every pixel of a similar colour — W">🪄 Wand<span class="k">W</span></button>
-        <button data-tool="crop" title="Crop the canvas to a region — C">✂ Crop<span class="k">C</span></button>
-        <button data-tool="select" title="Select, move, resize and rotate — V">🖱️ Select<span class="k">V</span></button>
         <button id="btn-flatten" title="Bake shapes and text into pixels">🔒 Flatten</button>
+        <button id="btn-onion" title="Show neighbouring frames as a ghost">🧅 Onion</button>
         <button id="btn-place-img" title="Drop a picture into this frame as a movable object">🖼️ Insert image</button>
         <button id="btn-frame-copy" title="Copy everything on this frame's layer to other frames">⧉ Frame to…</button>
-      </div>
-      <h4>View</h4>
-      <div class="grid2">
-        <button data-tool="pan" title="Pan the canvas — H">✋ Pan<span class="k">H</span></button>
-        <button id="btn-onion" title="Show neighbouring frames as a ghost">🧅 Onion</button>
       </div>
       <h4>Symmetry</h4>
       <div class="grid4">
@@ -550,7 +596,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
   </div>
 
   <!-- CENTER -->
-  <div class="panel stage">
+  <div class="panel stage" id="stage">
     <div class="toolbar">
       <button id="btn-add" class="green">➕ Frame</button>
       <button id="btn-dup">📋 Duplicate</button>
@@ -620,7 +666,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
   </div>
 
   <!-- RIGHT -->
-  <div class="panel">
+  <div class="panel props">
     <div class="sec">
       <h3>🖼️ Canvas</h3>
       <select id="canvas-size">
@@ -817,6 +863,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <div class="wcard resume" id="w-resume" style="display:none">
         <span class="big">⏪</span><b>Continue</b><span id="w-resume-sub">Pick up your last session</span>
       </div>
+      <div class="wcard" id="w-projects"><span class="big">🗂️</span><b>My projects</b><span id="w-projects-sub">Everything saved on this device</span></div>
       <div class="wcard" id="w-new"><span class="big">✨</span><b>New project</b><span>Start on a blank canvas</span></div>
       <div class="wcard" id="w-import"><span class="big">📥</span><b>Import GIF or images</b><span>Open an existing animation, or a pile of stills</span></div>
       <div class="wcard" id="w-open"><span class="big">📂</span><b>Open project</b><span>A .json you saved from here before</span></div>
@@ -825,6 +872,18 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <div class="wfoot">
       <label><input type="checkbox" id="w-skip"> Skip this next time</label>
       <button id="w-close">Straight to the editor →</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="projects">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Projects" style="width:min(560px,100%)">
+    <h2>🗂️ Projects</h2>
+    <p class="sub">Everything here is saved in this browser, on this device. Nothing is uploaded.</p>
+    <div id="proj-list"></div>
+    <div class="foot">
+      <button id="proj-new" class="green">✨ New project</button>
+      <button id="proj-close">Close</button>
     </div>
   </div>
 </div>
@@ -1814,8 +1873,8 @@ function setTool(t, sh) {
   if (typeof pixFloat !== 'undefined' && pixFloat && t !== tool) dropPixels();
   if (t !== 'marquee' && t !== 'lasso' && t !== 'wand' && typeof pixSel !== 'undefined' && pixSel) setPixSelMask(null);
   tool = t; shape = sh || null;
-  document.querySelectorAll('#tools button[data-tool],#stamps button').forEach(b => b.classList.remove('on'));
-  const btn = document.querySelector(sh ? '#stamps [data-shape="' + sh + '"]' : '#tools [data-tool="' + t + '"]');
+  document.querySelectorAll('button[data-tool],#stamps button').forEach(b => b.classList.remove('on'));
+  const btn = document.querySelector(sh ? '#stamps [data-shape="' + sh + '"]' : '[data-tool="' + t + '"]');
   if (btn) btn.classList.add('on');
   if (t !== 'select') sel = -1;
   if (t !== 'crop') setCropRect(null);
@@ -3079,8 +3138,10 @@ async function autosaveNow() {
   saving = true;
   try {
     saveState('Saving…');
-    const doc = { at: Date.now(), frames: frames.length, data: projectData() };
-    await idb('readwrite', st => st.put(doc, SLOT));
+    if (!projectId) setProject(newProjectId(), projectName);
+    const doc = { id: projectId, name: projectName, at: Date.now(),
+                  frames: frames.length, thumb: projectThumb(), data: projectData() };
+    await idb('readwrite', st => st.put(doc, PKEY(projectId)));
     const t = new Date();
     saveState('Saved ' + String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'));
   } catch (err) {
@@ -3145,10 +3206,14 @@ function applyProject(data, done) {
 }
 
 async function offerRestore() {
-  let doc;
-  try { doc = await idb('readonly', st => st.get(SLOT)); }
-  catch { showWelcome(null); return; }
-  if (!doc || !doc.data || !doc.data.frames || !doc.data.frames.length) { showWelcome(null); return; }
+  await migrateLegacy();
+  let doc = null;
+  try {
+    const wanted = localStorage.getItem('fs-project');
+    const all = await listProjects();
+    doc = (wanted && all.find(d => d.id === wanted)) || all[0] || null;
+  } catch (_) { doc = null; }
+  if (!doc) { setProject(newProjectId(), 'Untitled'); showWelcome(null); return; }
   const when = new Date(doc.at);
   if (showWelcome(doc)) return;          // the welcome screen offers it instead
 
@@ -3158,12 +3223,12 @@ async function offerRestore() {
   $('restore-bar').style.display = 'flex';
   $('restore-yes').onclick = () => {
     $('restore-bar').style.display = 'none';
-    applyProject(doc.data, () => toast('Restored ' + frames.length + ' frames from autosave.', 'good'));
+    openProjectRecord(doc);
   };
-  $('restore-no').onclick = async () => {
+  $('restore-no').onclick = () => {
     $('restore-bar').style.display = 'none';
-    try { await idb('readwrite', st => st.delete(SLOT)); } catch {}
-    toast('Autosave discarded.');
+    setProject(newProjectId(), 'Untitled');
+    toast('Left it where it was \u2014 it is still under Projects.');
   };
 }
 
@@ -3211,7 +3276,6 @@ function saveProject() {
   download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'frame-studio-project.json');
   dirty = false;
   toast('Project saved.', 'good');
-  idb('readwrite', st => st.delete(SLOT)).catch(() => {});
   saveState('');
 }
 function loadProject(file) {
@@ -3334,7 +3398,7 @@ const fontNames = availableFonts();
 if (!fontNames.includes(selectedFont)) selectedFont = fontNames[0] || 'sans-serif';
 
 /* ---------------------------------------------------------------- wiring */
-document.querySelectorAll('#tools button[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
+document.querySelectorAll('button[data-tool]').forEach(b => b.onclick = () => setTool(b.dataset.tool));
 document.querySelectorAll('#stamps button').forEach(b => b.onclick = () => setTool('stamp', b.dataset.shape));
 
 $('mode-fill').onclick = () => { styleMode = 'fill'; $('mode-fill').classList.add('on'); $('mode-stroke').classList.remove('on'); editSel(o => o.mode = 'fill'); };
@@ -4219,6 +4283,7 @@ function setLayerShared(on) {
    out of step with the interface the way a hand-written list would. */
 let findIndex = [];
 function labelFor(el) {
+  if (el.closest('#rail-tools')) return TOOL_NAMES[el.dataset.tool] || (el.title || '').split('—')[0].trim();
   if (el.tagName === 'BUTTON') return el.textContent.replace(/\s+/g, ' ').trim();
   const row = el.closest('.fx-row');
   if (row) return row.querySelector('span') ? row.querySelector('span').textContent.trim() : '';
@@ -4246,11 +4311,12 @@ function labelFor(el) {
 function buildFindIndex() {
   findIndex = [];
   const seen = new Set();
-  document.querySelectorAll('.wrap .sec, .toolbar, .zoombar, #tl-head').forEach(sec => {
+  document.querySelectorAll('.wrap .sec, .toolbar, .zoombar, #tl-head, #rail-tools').forEach(sec => {
     const h = sec.querySelector ? sec.querySelector(':scope > h3') : null;
     const where = h ? h.textContent.trim()
       : sec.classList.contains('toolbar') ? '🎞️ Frames'
-      : sec.classList.contains('zoombar') ? '🔍 Zoom' : '🎞️ Timeline';
+      : sec.classList.contains('zoombar') ? '🔍 Zoom'
+      : sec.id === 'rail-tools' ? '🎨 Tools' : '🎞️ Timeline';
     // walk in document order so each control picks up the sub-heading above it:
     // the symmetry mirrors are labelled with glyphs, and "Symmetry" is the
     // word anyone would actually type
@@ -4264,7 +4330,7 @@ function buildFindIndex() {
       findIndex.push({
         el, name,
         where: where + (group ? ' › ' + group : ''),
-        extra: (el.title || '') + ' ' + (el.id || '') + ' ' + group
+        extra: (el.title || '') + ' ' + (el.id || '') + ' ' + (el.dataset.tool || '') + ' ' + group
       });
     });
   });
@@ -4692,6 +4758,162 @@ $('pix-copy').onclick = pixCopy;
 $('pix-crop').onclick = pixCrop;
 $('pix-invert').onclick = pixInvert;
 
+/* ====================================================== multiple projects */
+/* Autosave used to hold exactly one slot, so starting a second animation
+   quietly threw away the first one's recovery point. Each project is its own
+   record now, keyed by id, and the app keeps writing to whichever one is
+   open. The old single slot is migrated on first run rather than dropped. */
+const PKEY = id => 'proj:' + id;
+let projectId = null, projectName = 'Untitled';
+
+function newProjectId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+function idbAll() {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const st = tx.objectStore(STORE);
+    const out = [];
+    const rq = st.openCursor();
+    rq.onsuccess = () => {
+      const c = rq.result;
+      if (!c) { res(out); return; }
+      if (typeof c.key === 'string' && c.key.startsWith('proj:')) out.push(c.value);
+      c.continue();
+    };
+    rq.onerror = () => rej(rq.error);
+  }));
+}
+async function listProjects() {
+  try {
+    const all = await idbAll();
+    return all.filter(d => d && d.data).sort((a, b) => b.at - a.at);
+  } catch (_) { return []; }
+}
+/* A small picture of frame one, so the lists are recognisable at a glance
+   rather than a column of identical names and dates. */
+function projectThumb() {
+  const t = makeCanvas(160, 160), c = t.getContext('2d');
+  c.fillStyle = $('bg-transparent').checked ? '#ffffff' : $('bg-color').value;
+  c.fillRect(0, 0, 160, 160);
+  const s = Math.min(160 / W, 160 / H);
+  c.save();
+  c.translate((160 - W * s) / 2, (160 - H * s) / 2);
+  c.scale(s, s);
+  if (frames[0]) renderFrame(c, frames[0]);
+  c.restore();
+  return t.toDataURL('image/jpeg', 0.6);
+}
+function setProject(id, name) {
+  projectId = id || newProjectId();
+  projectName = name || 'Untitled';
+  $('proj-name').textContent = projectName;
+  try { localStorage.setItem('fs-project', projectId); } catch (_) {}
+}
+function renameProject() {
+  const name = prompt('Name this project', projectName);
+  if (name == null) return;
+  projectName = name.trim() || 'Untitled';
+  $('proj-name').textContent = projectName;
+  dirty = true;
+  scheduleAutosave(0);
+}
+async function openProjectRecord(doc) {
+  if (!doc || !doc.data) return;
+  closeWelcome();
+  $('projects').classList.remove('open');
+  setProject(doc.id, doc.name);
+  applyProject(doc.data, () => {
+    dirty = false;
+    toast('Opened “' + projectName + '” — ' + frames.length + ' frames.', 'good');
+  });
+}
+async function deleteProjectRecord(doc, refresh) {
+  askConfirm('Delete “' + (doc.name || 'Untitled') + '”?',
+    'This removes the saved copy for good. It cannot be undone.',
+    'Delete project', async () => {
+      try { await idb('readwrite', st => st.delete(PKEY(doc.id))); } catch (_) {}
+      if (doc.id === projectId) setProject(newProjectId(), 'Untitled');
+      toast('Project deleted.');
+      if (refresh) refresh();
+    });
+}
+async function duplicateProjectRecord(doc, refresh) {
+  const copy = Object.assign({}, doc, {
+    id: newProjectId(), name: (doc.name || 'Untitled') + ' copy', at: Date.now()
+  });
+  try { await idb('readwrite', st => st.put(copy, PKEY(copy.id))); toast('Duplicated.'); } catch (_) {}
+  if (refresh) refresh();
+}
+
+/* ---- the manager ---- */
+async function openProjects() {
+  $('projects').classList.add('open');
+  const host = $('proj-list');
+  host.innerHTML = '<p class="sub">Loading…</p>';
+  const all = await listProjects();
+  host.innerHTML = '';
+  if (!all.length) {
+    host.innerHTML = '<p class="sub">Nothing saved yet. Whatever you draw is saved here automatically.</p>';
+    return;
+  }
+  all.forEach(doc => {
+    const row = document.createElement('div');
+    row.className = 'prow' + (doc.id === projectId ? ' current' : '');
+    const im = document.createElement('img');
+    im.src = doc.thumb || '';
+    im.alt = '';
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const nm = document.createElement('b');
+    nm.textContent = doc.name || 'Untitled';
+    const sub = document.createElement('span');
+    sub.textContent = (doc.frames || 0) + (doc.frames === 1 ? ' frame · ' : ' frames · ') +
+      new Date(doc.at).toLocaleString() + (doc.id === projectId ? ' · open now' : '');
+    meta.append(nm, sub);
+    const ops = document.createElement('div');
+    ops.className = 'pops';
+    const mk = (label, title, fn, cls) => {
+      const b = document.createElement('button');
+      b.textContent = label; b.title = title;
+      if (cls) b.className = cls;
+      b.onclick = e => { e.stopPropagation(); fn(); };
+      return b;
+    };
+    ops.append(
+      mk('Open', 'Open this project', () => openProjectRecord(doc)),
+      mk('⧉', 'Duplicate', () => duplicateProjectRecord(doc, openProjects)),
+      mk('✕', 'Delete', () => deleteProjectRecord(doc, openProjects), 'danger')
+    );
+    row.append(im, meta, ops);
+    row.onclick = () => openProjectRecord(doc);
+    host.appendChild(row);
+  });
+}
+$('btn-projects').onclick = openProjects;
+$('proj-close').onclick = () => $('projects').classList.remove('open');
+$('projects').onclick = e => { if (e.target.id === 'projects') $('projects').classList.remove('open'); };
+$('proj-new').onclick = () => { $('projects').classList.remove('open'); startFreshProject(); };
+$('proj-name').onclick = renameProject;
+
+function startFreshProject(w, h) {
+  setProject(newProjectId(), 'Untitled');
+  newProject(w, h);
+  saveState('');
+}
+/* One migration for anyone who has the old single-slot autosave. */
+async function migrateLegacy() {
+  try {
+    const old = await idb('readonly', st => st.get(SLOT));
+    if (!old || !old.data) return null;
+    const doc = { id: newProjectId(), name: 'Recovered project', at: old.at || Date.now(),
+                  frames: old.frames || (old.data.frames || []).length, thumb: '', data: old.data };
+    await idb('readwrite', st => st.put(doc, PKEY(doc.id)));
+    await idb('readwrite', st => st.delete(SLOT));
+    return doc;
+  } catch (_) { return null; }
+}
+
 /* ================================================================ confirm */
 let confirmCb = null;
 function askConfirm(title, body, yesLabel, onYes) {
@@ -4992,18 +5214,20 @@ async function importVideo(file) {
 /* ================================================================= rails */
 /* Focus mode remembers what was open before it, so leaving it puts the
    workspace back exactly as it was rather than showing everything. */
-let railState = { left: true, right: true, timeline: true, focusPrev: null };
+let railState = { left: true, right: true, timeline: true, rail: true, focusPrev: null };
 function applyRails() {
   const w = document.querySelector('.wrap');
   w.classList.toggle('no-left', !railState.left);
   w.classList.toggle('no-right', !railState.right);
   w.classList.toggle('no-timeline', !railState.timeline);
+  w.classList.toggle('no-rail', !railState.rail);
   $('btn-rail-l').classList.toggle('on', railState.left);
   $('btn-rail-r').classList.toggle('on', railState.right);
   $('btn-rail-t').classList.toggle('on', railState.timeline);
-  const focused = !railState.left && !railState.right && !railState.timeline;
+  $('btn-rail-k').classList.toggle('on', railState.rail);
+  const focused = !railState.left && !railState.right && !railState.timeline && !railState.rail;
   $('btn-focus').classList.toggle('on', focused);
-  try { localStorage.setItem('fs-rails', JSON.stringify({ l: railState.left, r: railState.right, t: railState.timeline })); } catch (_) {}
+  try { localStorage.setItem('fs-rails', JSON.stringify({ l: railState.left, r: railState.right, t: railState.timeline, k: railState.rail })); } catch (_) {}
   if (zoomIsFit) setTimeout(zoomFit, 30);       // after the grid has re-solved
   else applyZoom();
 }
@@ -5013,14 +5237,14 @@ function toggleRail(which) {
   applyRails();
 }
 function toggleFocus() {
-  const focused = !railState.left && !railState.right && !railState.timeline;
+  const focused = !railState.left && !railState.right && !railState.timeline && !railState.rail;
   if (focused && railState.focusPrev) {
     Object.assign(railState, railState.focusPrev, { focusPrev: null });
   } else if (focused) {
-    Object.assign(railState, { left: true, right: true, timeline: true, focusPrev: null });
+    Object.assign(railState, { left: true, right: true, timeline: true, rail: true, focusPrev: null });
   } else {
-    railState.focusPrev = { left: railState.left, right: railState.right, timeline: railState.timeline };
-    Object.assign(railState, { left: false, right: false, timeline: false });
+    railState.focusPrev = { left: railState.left, right: railState.right, timeline: railState.timeline, rail: railState.rail };
+    Object.assign(railState, { left: false, right: false, timeline: false, rail: false });
   }
   applyRails();
   flash(railState.left ? 'Panels back.' : 'Focus mode — press Tab to bring the panels back.');
@@ -5028,10 +5252,11 @@ function toggleFocus() {
 $('btn-rail-l').onclick = () => toggleRail('left');
 $('btn-rail-r').onclick = () => toggleRail('right');
 $('btn-rail-t').onclick = () => toggleRail('timeline');
+$('btn-rail-k').onclick = () => toggleRail('rail');
 $('btn-focus').onclick = toggleFocus;
 try {
   const r = JSON.parse(localStorage.getItem('fs-rails') || 'null');
-  if (r) Object.assign(railState, { left: r.l !== false, right: r.r !== false, timeline: r.t !== false });
+  if (r) Object.assign(railState, { left: r.l !== false, right: r.r !== false, timeline: r.t !== false, rail: r.k !== false });
 } catch (_) {}
 
 /* =============================================================== welcome */
@@ -5063,8 +5288,8 @@ function openWelcome() {
   if (doc) {
     const when = new Date(doc.at);
     $('w-resume').style.display = '';
-    $('w-resume-sub').textContent = doc.frames + (doc.frames === 1 ? ' frame' : ' frames') +
-      ', saved ' + when.toLocaleString();
+    $('w-resume-sub').textContent = '\u201c' + (doc.name || 'Untitled') + '\u201d \u2014 ' +
+      doc.frames + (doc.frames === 1 ? ' frame' : ' frames') + ', saved ' + when.toLocaleString();
   } else {
     $('w-resume').style.display = 'none';
   }
@@ -5083,14 +5308,12 @@ function newProject(w, h) {
   closeWelcome();
   if (zoomIsFit) zoomFit();
 }
-$('w-new').onclick = () => newProject();
+$('w-new').onclick = () => startFreshProject();
 $('w-import').onclick = () => { closeWelcome(); $('file-img').click(); };
 $('w-open').onclick = () => { closeWelcome(); $('file-proj').click(); };
 $('w-close').onclick = closeWelcome;
-$('w-resume').onclick = () => {
-  closeWelcome();
-  if (welcomeDoc) applyProject(welcomeDoc.data, () => toast('Restored ' + frames.length + ' frames from autosave.', 'good'));
-};
+$('w-resume').onclick = () => { if (welcomeDoc) openProjectRecord(welcomeDoc); else closeWelcome(); };
+$('w-projects').onclick = () => { closeWelcome(); openProjects(); };
 $('w-skip').onchange = e => { try { localStorage.setItem('fs-skip-welcome', e.target.checked ? '1' : '0'); } catch (_) {} };
 $('brand').onclick = e => { e.preventDefault(); openWelcome(); };
 (() => {
@@ -5102,7 +5325,7 @@ $('brand').onclick = e => { e.preventDefault(); openWelcome(); };
   WELCOME_SIZES.forEach(([label, w, h]) => {
     const b = document.createElement('button');
     b.textContent = label;
-    b.onclick = () => newProject(w, h);
+    b.onclick = () => startFreshProject(w, h);
     host.appendChild(b);
   });
 })();
@@ -5118,7 +5341,8 @@ function setTimelineSize(px) {
 }
 const TOOL_NAMES = { select: 'Select', brush: 'Brush', eraser: 'Eraser', line: 'Line', rect: 'Rectangle',
   ellipse: 'Ellipse', fill: 'Fill', text: 'Text', eyedrop: 'Picker', spray: 'Spray', smudge: 'Smudge',
-  pan: 'Pan', crop: 'Crop', stamp: 'Stamp' };
+  pan: 'Pan', crop: 'Crop', stamp: 'Stamp',
+  marquee: 'Marquee', lasso: 'Lasso', wand: 'Magic wand' };
 function updateStatus() {
   if (!frames.length) return;
   const ms = frames.reduce((n, f) => n + f.delay, 0);
@@ -5379,7 +5603,8 @@ const COMMANDS = [
   { g: 'View', n: 'Actual size', k: '1', r: () => { zoomIsFit = false; setZoom(1); } },
   { g: 'View', n: 'Focus mode — hide the panels', k: 'Tab', r: toggleFocus },
   { g: 'View', n: 'Find a tool or setting', k: '/', r: () => { $('find').focus(); } },
-  { g: 'View', n: 'Show or hide the tool rail', r: () => toggleRail('left') },
+  { g: 'View', n: 'Show or hide the tool menu', r: () => toggleRail('rail') },
+  { g: 'View', n: 'Show or hide the tool options', r: () => toggleRail('left') },
   { g: 'View', n: 'Show or hide the properties rail', r: () => toggleRail('right') },
   { g: 'View', n: 'Show or hide the timeline', r: () => toggleRail('timeline') },
   { g: 'View', n: 'Collapse every panel section', r: () => setAllSections(false) },
@@ -5393,7 +5618,9 @@ const COMMANDS = [
   { g: 'File', n: 'Export animated PNG (APNG)', r: exportAPNG },
   { g: 'File', n: 'Save project', k: 'Ctrl+S', r: saveProject },
   { g: 'File', n: 'Open project…', r: () => $('file-proj').click() },
-  { g: 'File', n: 'New project', r: () => newProject() },
+  { g: 'File', n: 'New project', r: () => startFreshProject() },
+  { g: 'File', n: 'Projects \u2014 everything saved here', r: openProjects },
+  { g: 'File', n: 'Rename this project', r: renameProject },
   { g: 'File', n: 'Show the welcome screen', r: openWelcome },
   { g: 'File', n: 'Import GIF or images…', r: () => $('file-img').click() },
   { g: 'File', n: 'Import a video as frames…', r: () => $('file-video').click() },
