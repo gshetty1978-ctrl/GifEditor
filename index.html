@@ -164,6 +164,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 #credit{flex:0 0 auto;text-align:center;padding:7px 12px 10px;font-size:11px;color:var(--muted);
   letter-spacing:.04em;opacity:.8}
 
+.scrubrow{display:flex;align-items:center;gap:8px;width:100%}
+.scrubrow .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.scrubrow input[type=range]{flex:1}
+.scrubrow .readout{font-variant-numeric:tabular-nums;color:var(--muted);font-size:12px;min-width:52px;text-align:right}
+@media (pointer:coarse){ .scrubrow input[type=range]{height:30px} }
+
 /* ---- brand ---- */
 .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:inherit;flex:0 0 auto}
 .brand .mark{width:30px;height:30px;flex:0 0 auto}
@@ -478,6 +484,10 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <button id="sel-del" class="danger" title="Delete (Del)">🗑️ Delete</button>
       </div>
       <div class="grid2" style="margin-top:6px">
+        <button id="sel-continue" class="green" title="Carry on the movement of the last three frames into new ones">↝ Continue motion</button>
+        <input type="number" id="continue-n" value="4" min="1" max="60" title="How many frames to carry it on for">
+      </div>
+      <div class="grid2" style="margin-top:6px">
         <button id="sel-tonext" title="Put a copy of this on the next frame">→ Next frame</button>
         <button id="sel-toall" title="Put a copy of this on every other frame, in the same place">⧉ All frames</button>
       </div>
@@ -568,6 +578,11 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <div class="canvas-shell" id="shell"><canvas id="view" width="500" height="500"></canvas></div>
     </div>
 
+    <div class="scrubrow">
+      <span class="lbl">Frame</span>
+      <input type="range" id="scrub" min="0" max="0" value="0" title="Drag to move through the animation">
+      <span class="readout" id="scrub-lbl">1 / 1</span>
+    </div>
     <div class="zoombar">
       <button id="zoom-out" title="Zoom out — minus key">−</button>
       <span class="readout" id="zoom-val">100%</span>
@@ -1432,6 +1447,7 @@ function refreshAll() {
   syncSelPanel();
   updateAnimInfo();
   updateStatus();
+  syncScrub();
 }
 function updateAnimInfo() {
   const ms = frames.reduce((n, f) => n + f.delay, 0);
@@ -1753,6 +1769,7 @@ function startPlay() {
     cur = i;
     repaint();
     frames.forEach((f, k) => f.el && f.el.classList.toggle('sel', k === i));
+    syncScrub();                              // the scrubber tracks playback too
     const d = F().delay;
     i = (i + 1) % frames.length;
     playTimer = setTimeout(step, Math.max(16, d / playSpeed));   // preview only; export keeps real timing
@@ -1911,6 +1928,9 @@ function textStyleFromPanel() {
 view.addEventListener('pointerdown', e => {
   if (playing) stopPlay();
   try { view.setPointerCapture(e.pointerId); } catch (_) {}
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 2) { beginPinch(); return; }
+  if (pinch) return;
   readPressure(e);
   const p = pos(e);
   shiftKey = e.shiftKey;
@@ -2036,6 +2056,8 @@ view.addEventListener('pointerdown', e => {
 });
 
 view.addEventListener('pointermove', e => {
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch) { updatePinch(); return; }
   readPressure(e);
   const p = pos(e);
   shiftKey = e.shiftKey;
@@ -4646,6 +4668,168 @@ $('pix-copy').onclick = pixCopy;
 $('pix-crop').onclick = pixCrop;
 $('pix-invert').onclick = pixInvert;
 
+/* ====================================================== continue a motion */
+/* Once something has been moved across three frames there is enough evidence
+   to say where it was going, so the app can keep it going. Two steps give a
+   direction; comparing those two steps also gives the turn between them and
+   whether it is speeding up, which is what lets an arc carry on curving
+   instead of flying off on the tangent. */
+function findObjInFrame(f, id) {
+  for (let li = 0; li < f.layers.length; li++) {
+    const oi = f.layers[li].objs.findIndex(o => o.id === id);
+    if (oi >= 0) return { layer: f.layers[li], obj: f.layers[li].objs[oi], li, oi };
+  }
+  return null;
+}
+/* The frames ending at the current one on which this object appears, oldest
+   first. A gap stops the trail: motion either side of it is not one motion. */
+function motionTrail(id, max) {
+  const trail = [];
+  for (let i = cur; i >= 0 && trail.length < (max || 6); i--) {
+    const hit = findObjInFrame(frames[i], id);
+    if (!hit) break;
+    trail.unshift({ frame: frames[i], o: hit.obj });
+  }
+  return trail;
+}
+function continueMotion(count) {
+  const o = selObj();
+  if (!o) { toast('Select the shape, text or image you want to carry on.', 'bad'); return; }
+  if (L().shared) { toast('That layer is shared with every frame, so the object cannot move frame to frame. Unshare it first.', 'bad'); return; }
+  const trail = motionTrail(o.id);
+  if (trail.length < 3) {
+    toast('Move it across three frames first — two steps are what show a direction. It is on ' +
+          trail.length + (trail.length === 1 ? ' frame.' : ' frames.'), 'bad');
+    return;
+  }
+  const steps = [];
+  for (let i = 1; i < trail.length; i++) {
+    const a = trail[i - 1].o, b = trail[i].o;
+    steps.push({
+      x: b.x - a.x, y: b.y - a.y,
+      rot: (b.rot || 0) - (a.rot || 0),
+      w: (b.w || 0) - (a.w || 0), h: (b.h || 0) - (a.h || 0),
+      size: (b.size || 0) - (a.size || 0),
+      alpha: (b.alpha != null ? b.alpha : 1) - (a.alpha != null ? a.alpha : 1)
+    });
+  }
+  const last = steps[steps.length - 1];
+  const dist = Math.hypot(last.x, last.y);
+  const spun = Math.abs(last.rot) > 0.004 || Math.abs(last.w) > 0.4 || Math.abs(last.size) > 0.4 ||
+               Math.abs(last.alpha) > 0.004;
+  if (dist < 0.6 && !spun) { toast('It has not actually moved or changed over those frames.', 'bad'); return; }
+
+  /* Turn and speed-up are read from consecutive steps and then held constant,
+     which continues a curve as a curve. Both are clamped: extrapolation is a
+     guess, and an unclamped guess spirals. */
+  let turn = 0, accel = 1, pairs = 0;
+  for (let i = 1; i < steps.length; i++) {
+    const a = steps[i - 1], b = steps[i];
+    const la = Math.hypot(a.x, a.y), lb = Math.hypot(b.x, b.y);
+    if (la < 0.5 || lb < 0.5) continue;
+    let d = Math.atan2(b.y, b.x) - Math.atan2(a.y, a.x);
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    turn += d;
+    accel += lb / la - 1;
+    pairs++;
+  }
+  if (pairs) { turn /= pairs; accel = 1 + (accel - 1) / pairs; }
+  turn = Math.max(-0.6, Math.min(0.6, turn));
+  accel = Math.max(0.6, Math.min(1.6, accel));
+
+  stopPlay();
+  pushStruct();
+  const n = Math.max(1, Math.min(60, count || 4));
+  let vx = last.x, vy = last.y;
+  let src = frames[cur];
+  const made = [];
+  for (let i = 0; i < n; i++) {
+    const nx = vx * Math.cos(turn) - vy * Math.sin(turn);
+    const ny = vx * Math.sin(turn) + vy * Math.cos(turn);
+    vx = nx * accel; vy = ny * accel;
+    const f = { layers: src.layers.map(l => copyLayerForFrame(l, true)), active: src.active, delay: src.delay };
+    const hit = findObjInFrame(f, o.id);
+    if (!hit) break;
+    const q = hit.obj;
+    q.x += vx; q.y += vy;
+    if (last.rot) q.rot = (q.rot || 0) + last.rot;
+    if (last.w) q.w = Math.max(4, (q.w || 0) + last.w);
+    if (last.h) q.h = Math.max(4, (q.h || 0) + last.h);
+    if (last.size && q.type === 'text') { q.size = Math.max(6, q.size + last.size); measureObj(q); }
+    if (last.alpha) q.alpha = Math.max(0.05, Math.min(1, (q.alpha != null ? q.alpha : 1) + last.alpha));
+    made.push(f);
+    src = f;
+  }
+  if (!made.length) { undoStack.pop(); updateHistoryButtons(); toast('Could not carry that one on.', 'bad'); return; }
+  frames.splice(cur + 1, 0, ...made);
+  cur += made.length;
+  dirty = true;
+  renderTimeline(); refreshAll();
+  const shape = Math.abs(turn) > 0.05 ? 'curve' : 'line';
+  toast('Added ' + made.length + (made.length === 1 ? ' frame' : ' frames') +
+        ' carrying on the ' + shape + ' at ' + Math.round(Math.hypot(last.x, last.y)) + 'px a frame' +
+        (accel > 1.05 ? ', speeding up' : accel < 0.95 ? ', slowing down' : '') + '.', 'good');
+}
+$('sel-continue').onclick = () => continueMotion(+$('continue-n').value || 4);
+
+/* ============================================== pinch to zoom, drag to pan */
+/* Two fingers on the canvas mean navigation, not drawing. The second finger
+   landing also has to undo whatever the first one just started, or every
+   pinch would leave a stray dot behind. */
+const pointers = new Map();
+let pinch = null;
+function pinchGeom() {
+  const p = [...pointers.values()];
+  return {
+    d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y),
+    cx: (p[0].x + p[1].x) / 2,
+    cy: (p[0].y + p[1].y) / 2
+  };
+}
+function beginPinch() {
+  if (drawing && mode === 'paint' && snapshot) fctx().putImageData(snapshot, 0, 0);
+  if (drawing && (mode === 'create' || mode === 'paint')) { undoStack.pop(); updateHistoryButtons(); }
+  if (drawing && mode === 'create' && sel >= 0) { L().objs.splice(sel, 1); sel = -1; syncSelPanel(); }
+  drawing = false; mode = null; grab = null; pixDraft = null;
+  const g = pinchGeom();
+  const vp = $('viewport');
+  pinch = { d: g.d, cx: g.cx, cy: g.cy, zoom, sl: vp.scrollLeft, st: vp.scrollTop };
+  zoomIsFit = false;
+  repaint();
+}
+function updatePinch() {
+  if (pointers.size < 2) return;
+  const g = pinchGeom();
+  const vp = $('viewport');
+  if (pinch.d > 8) setZoom(pinch.zoom * (g.d / pinch.d));
+  // panning is the midpoint moving, which works whether or not the pinch scales
+  vp.scrollLeft = pinch.sl - (g.cx - pinch.cx);
+  vp.scrollTop = pinch.st - (g.cy - pinch.cy);
+}
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  if (pinch && pointers.size < 2) { pinch = null; setTool(tool, shape); }
+}
+window.addEventListener('pointerup', endPointer);
+window.addEventListener('pointercancel', endPointer);
+
+/* ================================================================ scrubber */
+function syncScrub() {
+  const s = $('scrub');
+  s.max = Math.max(0, frames.length - 1);
+  if (document.activeElement !== s) s.value = cur;
+  s.disabled = frames.length < 2;
+  $('scrub-lbl').textContent = (cur + 1) + ' / ' + frames.length;
+}
+$('scrub').oninput = e => {
+  const i = Math.max(0, Math.min(frames.length - 1, +e.target.value));
+  if (i === cur) return;
+  stopPlay();
+  cur = i; sel = -1;
+  refreshAll();
+};
+
 /* ==================================================== playback & presets */
 let playSpeed = 1;
 function applyFPS(fps) {
@@ -5086,6 +5270,7 @@ const COMMANDS = [
   { g: 'View', n: 'Bigger timeline thumbnails', r: () => setTimelineSize(tlSize + 14) },
   { g: 'View', n: 'Smaller timeline thumbnails', r: () => setTimelineSize(tlSize - 14) },
   { g: 'Frame', n: 'Ping-pong (bounce) the animation', r: pingPong },
+  { g: 'Frame', n: 'Continue the selected object’s motion', r: () => continueMotion(+$('continue-n').value || 4) },
   { g: 'Frame', n: 'Tween into the next frame', r: () => tween(Math.max(1, Math.min(60, +$('tween-n').value || 4))) },
   { g: 'Frame', n: 'Play / stop', k: 'Space', r: togglePlay },
   { g: 'Frame', n: 'Apply this delay to every frame', r: () => { const d = Math.max(20, +$('delay').value || 120); frames.forEach(f => f.delay = d); dirty = true; refreshAll(); toast('Delay applied to all frames.'); } },
