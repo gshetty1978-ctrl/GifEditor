@@ -237,14 +237,12 @@ html[data-theme="light"] .stage .viewport{--stagebg:#dbe0e9}
 .brand .mark .film{fill:var(--panel2);stroke:var(--line);stroke-width:2}
 .brand .mark .holes rect{fill:var(--accent);opacity:.55}
 .brand .mark .cel{fill:var(--accent)}
+/* No idle animation. A blink in the corner of the eye is the last thing
+   wanted next to a canvas someone is trying to draw on. */
 .brand:hover .mark .cel{fill:var(--accent2)}
-/* the cel advances like film through a gate, one frame at a time */
-.brand .mark .cel{animation:cel 3.2s steps(1,end) infinite}
-@keyframes cel{0%{opacity:1}70%{opacity:1}75%{opacity:.35}80%{opacity:1}}
 .brand .words{display:flex;flex-direction:column;line-height:1.05}
 .brand .words b{font-size:14px;font-weight:800;letter-spacing:.11em}
 .brand .words i{font-style:normal;font-size:10px;color:var(--muted);letter-spacing:.03em}
-@media(prefers-reduced-motion:reduce){.brand .mark .cel{animation:none}}
 
 /* ---- welcome ---- */
 #welcome .sheet{width:min(620px,100%);text-align:center;padding:30px 26px 22px}
