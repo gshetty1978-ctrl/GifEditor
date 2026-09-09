@@ -3829,6 +3829,9 @@ function flipLayer(l, horiz) {
   c.translate(horiz ? W : 0, horiz ? 0 : H);
   c.scale(horiz ? -1 : 1, horiz ? 1 : -1);
   c.drawImage(l.cv, 0, 0);
+  // A canvas hands back the same context every time, so this one outlives the
+  // flip. Leave it clean or every later edit onto the layer comes out mirrored.
+  c.setTransform(1, 0, 0, 1, 0, 0);
   l.cv = t;
 }
 function doFlip(horiz) {
@@ -3852,6 +3855,8 @@ function rotate90(dir) {
         if (dir > 0) { c.translate(nw, 0); c.rotate(Math.PI / 2); }
         else { c.translate(0, nh); c.rotate(-Math.PI / 2); }
         c.drawImage(cl.cv, 0, 0);
+        // Same reason as flipLayer: the context is reused for every later edit.
+        c.setTransform(1, 0, 0, 1, 0, 0);
         cl.cv = t;
         return cl;
       })
