@@ -479,6 +479,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <button data-tool="marquee" title="Select a rectangle of pixels — M"><i>▭</i><em>M</em></button>
     <button data-tool="lasso" title="Freehand pixel selection — Q"><i>✎</i><em>Q</em></button>
     <button data-tool="wand" title="Select every pixel of a similar colour — W"><i>🪄</i><em>W</em></button>
+    <button data-tool="smart" title="Smart select — drag a box around a thing in a picture, or just click it. Shift adds, Alt removes — J"><i>✨</i><em>J</em></button>
     <hr>
     <button data-tool="eyedrop" title="Colour picker — I"><i>💧</i><em>I</em></button>
     <button data-tool="crop" title="Crop the canvas — C"><i>✂</i><em>C</em></button>
@@ -1888,7 +1889,7 @@ function stopPlay() {
 /* ------------------------------------------------------------ tool setup */
 function setTool(t, sh) {
   if (typeof pixFloat !== 'undefined' && pixFloat && t !== tool) dropPixels();
-  if (t !== 'marquee' && t !== 'lasso' && t !== 'wand' && typeof pixSel !== 'undefined' && pixSel) setPixSelMask(null);
+  if (t !== 'marquee' && t !== 'lasso' && t !== 'wand' && t !== 'smart' && typeof pixSel !== 'undefined' && pixSel) setPixSelMask(null);
   tool = t; shape = sh || null;
   document.querySelectorAll('button[data-tool],#stamps button').forEach(b => b.classList.remove('on'));
   const btn = document.querySelector(sh ? '#stamps [data-shape="' + sh + '"]' : '[data-tool="' + t + '"]');
@@ -1908,6 +1909,7 @@ function setTool(t, sh) {
     marquee: 'Marquee — drag out a rectangle of pixels. Drag inside it to move them.',
     lasso: 'Lasso — draw around the pixels you want. Drag inside to move them.',
     wand: 'Wand — click a colour to select it. Shift-click grabs the whole drawn shape whatever colours are in it.',
+    smart: 'Smart select — drag a box around a thing, or click it. Shift adds to the selection, Alt takes away.',
     spray: 'Airbrush — hold and move. Size sets the spread, opacity the density.',
     smudge: 'Smudge — drag to pull colour along. Opacity sets the strength.',
     pan: 'Pan - drag to move around the canvas. Ctrl+wheel zooms.',
@@ -1981,7 +1983,7 @@ let pendingHist = false;
 function armHistory() { pendingHist = true; }
 function fireHistory() { if (pendingHist) { pendingHist = false; pushHistory(); } }
 
-const FREEHAND = { brush: 1, eraser: 1, spray: 1, smudge: 1, pan: 1, lasso: 1, wand: 1 };
+const FREEHAND = { brush: 1, eraser: 1, spray: 1, smudge: 1, pan: 1, lasso: 1, wand: 1, smart: 1 };
 function pos(e) {
   const r = view.getBoundingClientRect();
   const p = { x: (e.clientX - r.left) * (W / r.width), y: (e.clientY - r.top) * (H / r.height) };
@@ -2119,8 +2121,11 @@ view.addEventListener('pointerdown', e => {
   }
 
   /* ---- pixel selection ---- */
-  if (tool === 'marquee' || tool === 'lasso' || tool === 'wand') {
-    if (pointInSel(p)) {                       // grab the pixels and drag them
+  if (tool === 'marquee' || tool === 'lasso' || tool === 'wand' || tool === 'smart') {
+    if (tool === 'smart' && smartBusy) return;
+    const op = tool === 'smart' ? (e.shiftKey ? 'add' : e.altKey ? 'sub' : 'new') : 'new';
+    if (op === 'sub') e.preventDefault();
+    if (op === 'new' && pointInSel(p)) {                       // grab the pixels and drag them
       pushHistory();
       liftPixels();
       drawing = true; mode = 'pixmove';
@@ -2130,8 +2135,9 @@ view.addEventListener('pointerdown', e => {
     dropPixels();
     if (tool === 'wand') { wandAnyColour = e.shiftKey; setPixSelMask(null); wandSelect(p); wandAnyColour = false; return; }
     drawing = true; mode = 'pixdraw';
-    grab = { x: p.x, y: p.y, pts: [{ x: p.x, y: p.y }] };
-    setPixSelMask(null);
+    grab = { x: p.x, y: p.y, pts: [{ x: p.x, y: p.y }], op,
+             prev: op !== 'new' && pixSel ? pixSel.data.slice() : null };
+    if (op === 'new') setPixSelMask(null);
     return;
   }
 
@@ -2181,9 +2187,9 @@ view.addEventListener('pointermove', e => {
     setCropRect({ x: Math.min(grab.x, x), y: Math.min(grab.y, y),
                   w: Math.abs(x - grab.x), h: Math.abs(y - grab.y) });
   } else if (mode === 'pixdraw') {
-    if (tool === 'marquee') {
+    if (tool === 'marquee' || tool === 'smart') {
       let x = Math.max(0, Math.min(W, p.x)), y = Math.max(0, Math.min(H, p.y));
-      if (shiftKey) {
+      if (shiftKey && tool === 'marquee') {
         const d = Math.max(Math.abs(x - grab.x), Math.abs(y - grab.y));
         x = grab.x + Math.sign(x - grab.x || 1) * d;
         y = grab.y + Math.sign(y - grab.y || 1) * d;
@@ -2270,8 +2276,10 @@ window.addEventListener('pointerup', () => {
   }
   if (mode === 'pixdraw') {
     mode = null;
+    const g = grab;
     const pts = grab ? grab.pts : null;
     grab = null; pixDraft = null;
+    if (tool === 'smart') { repaint(); smartRun(g); return; }
     setPixSelMask(pts && pts.length > 2 ? polyToMask(pts) : null,
                   tool === 'marquee' ? 'Rectangle' : 'Lasso');
     return;
@@ -3695,6 +3703,7 @@ window.addEventListener('keydown', e => {
   if (k === 'm') { setTool('marquee'); return; }
   if (k === 'q') { setTool('lasso'); return; }
   if (k === 'w') { setTool('wand'); return; }
+  if (k === 'j') { setTool('smart'); return; }
   if (e.key === '/') { e.preventDefault(); $('find').focus(); $('find').select(); return; }
   if (e.key === ',') { selectFrame(cur - 1); return; }
   if (e.key === '.') { selectFrame(cur + 1); return; }
@@ -4603,7 +4612,39 @@ function eraseSelection(ctx) {
   ctx.drawImage(pixSel.cv, 0, 0);
   ctx.restore();
 }
+function layerWithObjects() {
+  const l = L();
+  if (!l.objs.length) return l.cv;
+  const t = makeCanvas(W, H, true), c = t.getContext('2d');
+  c.drawImage(l.cv, 0, 0);
+  l.objs.forEach(o => drawObject(c, o));
+  return t;
+}
+function selTouchesObjects() {
+  const l = L();
+  if (!l.objs.length || !pixSel) return false;
+  const b = pixSel.b;
+  const t = makeCanvas(b.w, b.h, true), c = t.getContext('2d');
+  c.translate(-b.x, -b.y);
+  l.objs.forEach(o => drawObject(c, o));
+  const d = c.getImageData(0, 0, b.w, b.h).data;
+  for (let y = 0; y < b.h; y++) {
+    const row = (b.y + y) * W + b.x;
+    for (let x = 0; x < b.w; x++) if (d[(y * b.w + x) * 4 + 3] && pixSel.data[row + x]) return true;
+  }
+  return false;
+}
+function pixBake(recorded) {
+  if (!selTouchesObjects()) return false;
+  if (!recorded) pushHistory();
+  bakeObjects(L());
+  sel = -1;
+  syncSelPanel();
+  flash('Turned the picture into pixels so the selection can be cut from it.');
+  return true;
+}
 function liftPixels() {
+  pixBake(true);
   const b = pixSel.b;
   const cv = maskedCopy(L().cv, b);
   eraseSelection(fctx());
@@ -4638,6 +4679,7 @@ function dropPixels() {
 function pixDelete() {
   if (!pixSel) return;
   pushHistory();
+  pixBake(true);
   eraseSelection(fctx());
   commit();
   toast('Cleared the selected pixels.');
@@ -4645,6 +4687,7 @@ function pixDelete() {
 function pixFill() {
   if (!pixSel) return;
   pushHistory();
+  pixBake(true);
   const t = makeCanvas(W, H, true), tc = t.getContext('2d');
   paintStyle(tc);
   tc.globalAlpha = 1;
@@ -4664,10 +4707,11 @@ function pixFill() {
 function pixToObject(cutFromLayer) {
   if (!pixSel) return;
   const b = pixSel.b;
-  const src = maskedCopy(L().cv, b).toDataURL('image/png');
+  const baked = cutFromLayer && pixBake(false);
+  const src = maskedCopy(layerWithObjects(), b).toDataURL('image/png');
   const img = new Image();
   img.onload = () => {
-    pushHistory();
+    if (!baked) pushHistory();
     if (cutFromLayer) eraseSelection(fctx());
     L().objs.push({
       id: nextObjId(), type: 'image', kind: 'image', src, img,
@@ -4687,7 +4731,7 @@ function pixToObject(cutFromLayer) {
 function pixCopy() {
   if (!pixSel) return;
   const b = pixSel.b;
-  const src = maskedCopy(L().cv, b).toDataURL('image/png');
+  const src = maskedCopy(layerWithObjects(), b).toDataURL('image/png');
   const img = new Image();
   img.onload = () => {
     objClip = {
@@ -4710,6 +4754,565 @@ function pixInvert() {
   const inv = new Uint8Array(W * H);
   for (let k = 0; k < inv.length; k++) inv[k] = pixSel.data[k] ? 0 : 1;
   setPixSelMask(inv, 'Inverted');
+}
+
+function smartMaxflow(n, st, head, sis, cap, tr) {
+  const NONE = -1, TERM = -2, ORPH = -3;
+  const parent = new Int32Array(n).fill(NONE);
+  const sink = new Uint8Array(n);
+  const ts = new Int32Array(n), dist = new Int32Array(n);
+  const q = new Int32Array(n + 1), inq = new Uint8Array(n);
+  let qh = 0, qt = 0;
+  const push = i => { if (inq[i]) return; inq[i] = 1; q[qt] = i; qt = qt === n ? 0 : qt + 1; };
+  const pop = () => { if (qh === qt) return -1; const i = q[qh]; qh = qh === n ? 0 : qh + 1; inq[i] = 0; return i; };
+  for (let i = 0; i < n; i++) {
+    if (tr[i] !== 0) { parent[i] = TERM; sink[i] = tr[i] < 0 ? 1 : 0; dist[i] = 1; push(i); }
+  }
+  let time = 0;
+  const orph = [];
+  const orphan = x => { parent[x] = ORPH; orph.push(x); };
+  function augment(e) {
+    let b = cap[e], x = head[sis[e]];
+    for (let a = parent[x]; a !== TERM; x = head[a], a = parent[x]) if (cap[sis[a]] < b) b = cap[sis[a]];
+    if (tr[x] < b) b = tr[x];
+    x = head[e];
+    for (let a = parent[x]; a !== TERM; x = head[a], a = parent[x]) if (cap[a] < b) b = cap[a];
+    if (-tr[x] < b) b = -tr[x];
+    cap[e] -= b; cap[sis[e]] += b;
+    x = head[sis[e]];
+    for (;;) {
+      const a = parent[x];
+      if (a === TERM) break;
+      cap[a] += b; cap[sis[a]] -= b;
+      if (cap[sis[a]] <= 0) orphan(x);
+      x = head[a];
+    }
+    tr[x] -= b;
+    if (tr[x] <= 0) orphan(x);
+    x = head[e];
+    for (;;) {
+      const a = parent[x];
+      if (a === TERM) break;
+      cap[sis[a]] += b; cap[a] -= b;
+      if (cap[a] <= 0) orphan(x);
+      x = head[a];
+    }
+    tr[x] += b;
+    if (tr[x] >= 0) orphan(x);
+  }
+  function adopt(i) {
+    const s = sink[i];
+    let best = NONE, dmin = 1e9;
+    for (let a0 = st[i]; a0 < st[i + 1]; a0++) {
+      if ((s ? cap[a0] : cap[sis[a0]]) <= 0) continue;
+      let j = head[a0];
+      if (sink[j] !== s || parent[j] === NONE) continue;
+      let d = 0, ok = false;
+      for (;;) {
+        if (ts[j] === time) { d += dist[j]; ok = true; break; }
+        const a = parent[j];
+        d++;
+        if (a === TERM) { ts[j] = time; dist[j] = 1; ok = true; break; }
+        if (a === ORPH || a === NONE) break;
+        j = head[a];
+      }
+      if (!ok) continue;
+      if (d < dmin) { best = a0; dmin = d; }
+      for (j = head[a0]; ts[j] !== time; j = head[parent[j]]) { ts[j] = time; dist[j] = d; d--; }
+    }
+    if (best !== NONE) { parent[i] = best; ts[i] = time; dist[i] = dmin + 1; return; }
+    parent[i] = NONE;
+    for (let a0 = st[i]; a0 < st[i + 1]; a0++) {
+      const j = head[a0], a = parent[j];
+      if (sink[j] !== s || a === NONE) continue;
+      if ((s ? cap[a0] : cap[sis[a0]]) > 0) push(j);
+      if (a !== TERM && a !== ORPH && head[a] === i) orphan(j);
+    }
+  }
+  let i = -1;
+  for (;;) {
+    if (i < 0 || parent[i] === NONE) {
+      i = pop();
+      if (i < 0) break;
+      if (parent[i] === NONE) { i = -1; continue; }
+    }
+    let mid = -1;
+    if (!sink[i]) {
+      for (let a = st[i]; a < st[i + 1]; a++) {
+        if (cap[a] <= 0) continue;
+        const j = head[a];
+        if (parent[j] === NONE) { sink[j] = 0; parent[j] = sis[a]; ts[j] = ts[i]; dist[j] = dist[i] + 1; push(j); }
+        else if (sink[j]) { mid = a; break; }
+        else if (ts[j] <= ts[i] && dist[j] > dist[i]) { parent[j] = sis[a]; ts[j] = ts[i]; dist[j] = dist[i] + 1; }
+      }
+    } else {
+      for (let a = st[i]; a < st[i + 1]; a++) {
+        if (cap[sis[a]] <= 0) continue;
+        const j = head[a];
+        if (parent[j] === NONE) { sink[j] = 1; parent[j] = sis[a]; ts[j] = ts[i]; dist[j] = dist[i] + 1; push(j); }
+        else if (!sink[j]) { mid = sis[a]; break; }
+        else if (ts[j] <= ts[i] && dist[j] > dist[i]) { parent[j] = sis[a]; ts[j] = ts[i]; dist[j] = dist[i] + 1; }
+      }
+    }
+    if (mid < 0) { i = -1; continue; }
+    time++;
+    augment(mid);
+    for (let k = 0; k < orph.length; k++) adopt(orph[k]);
+    orph.length = 0;
+  }
+  const out = new Uint8Array(n);
+  for (let k = 0; k < n; k++) out[k] = parent[k] !== NONE && !sink[k] ? 1 : 0;
+  return out;
+}
+
+function smartRand(seed) {
+  let s = seed >>> 0 || 1;
+  return () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; };
+}
+
+function smartKmeans(z, list, K, comp, rnd) {
+  const n = list.length;
+  const cent = new Float64Array(K * 3);
+  const d2 = new Float64Array(n);
+  let c0 = list[Math.floor(rnd() * n)];
+  cent[0] = z[c0 * 3]; cent[1] = z[c0 * 3 + 1]; cent[2] = z[c0 * 3 + 2];
+  for (let k = 1; k < K; k++) {
+    let sum = 0;
+    for (let t = 0; t < n; t++) {
+      const i = list[t] * 3;
+      let best = Infinity;
+      for (let c = 0; c < k; c++) {
+        const dr = z[i] - cent[c * 3], dg = z[i + 1] - cent[c * 3 + 1], db = z[i + 2] - cent[c * 3 + 2];
+        const d = dr * dr + dg * dg + db * db;
+        if (d < best) best = d;
+      }
+      d2[t] = best; sum += best;
+    }
+    let r = rnd() * sum, pick = n - 1;
+    for (let t = 0; t < n; t++) { r -= d2[t]; if (r <= 0) { pick = t; break; } }
+    const p = list[pick] * 3;
+    cent[k * 3] = z[p]; cent[k * 3 + 1] = z[p + 1]; cent[k * 3 + 2] = z[p + 2];
+  }
+  const acc = new Float64Array(K * 4);
+  for (let it = 0; it < 8; it++) {
+    acc.fill(0);
+    for (let t = 0; t < n; t++) {
+      const i = list[t] * 3;
+      let best = Infinity, bk = 0;
+      for (let c = 0; c < K; c++) {
+        const dr = z[i] - cent[c * 3], dg = z[i + 1] - cent[c * 3 + 1], db = z[i + 2] - cent[c * 3 + 2];
+        const d = dr * dr + dg * dg + db * db;
+        if (d < best) { best = d; bk = c; }
+      }
+      comp[list[t]] = bk;
+      acc[bk * 4] += z[i]; acc[bk * 4 + 1] += z[i + 1]; acc[bk * 4 + 2] += z[i + 2]; acc[bk * 4 + 3]++;
+    }
+    for (let c = 0; c < K; c++) {
+      const m = acc[c * 4 + 3];
+      if (m) { cent[c * 3] = acc[c * 4] / m; cent[c * 3 + 1] = acc[c * 4 + 1] / m; cent[c * 3 + 2] = acc[c * 4 + 2] / m; }
+    }
+  }
+}
+
+function smartFit(z, list, comp, K) {
+  const acc = new Float64Array(K * 10);
+  for (let t = 0; t < list.length; t++) {
+    const p = list[t], i = p * 3, o = comp[p] * 10;
+    const r = z[i], g = z[i + 1], b = z[i + 2];
+    acc[o] += 1; acc[o + 1] += r; acc[o + 2] += g; acc[o + 3] += b;
+    acc[o + 4] += r * r; acc[o + 5] += r * g; acc[o + 6] += r * b;
+    acc[o + 7] += g * g; acc[o + 8] += g * b; acc[o + 9] += b * b;
+  }
+  const total = list.length;
+  const models = [];
+  for (let c = 0; c < K; c++) {
+    const o = c * 10, m = acc[o];
+    if (!m) continue;
+    const mr = acc[o + 1] / m, mg = acc[o + 2] / m, mb = acc[o + 3] / m;
+    const eps = 9;
+    const a = acc[o + 4] / m - mr * mr + eps, bb = acc[o + 5] / m - mr * mg, cc = acc[o + 6] / m - mr * mb;
+    const d = acc[o + 7] / m - mg * mg + eps, e = acc[o + 8] / m - mg * mb;
+    const f = acc[o + 9] / m - mb * mb + eps;
+    const i00 = d * f - e * e, i01 = cc * e - bb * f, i02 = bb * e - cc * d;
+    const det = a * i00 + bb * i01 + cc * i02;
+    if (!(det > 1e-12)) continue;
+    const i11 = a * f - cc * cc, i12 = bb * cc - a * e, i22 = a * d - bb * bb;
+    models.push({
+      mr, mg, mb,
+      i00: i00 / det, i01: i01 / det, i02: i02 / det, i11: i11 / det, i12: i12 / det, i22: i22 / det,
+      k: Math.log(m / total) - 0.5 * Math.log(det)
+    });
+  }
+  return models;
+}
+
+function smartCost(models, r, g, b) {
+  let best = -Infinity;
+  const terms = [];
+  for (let c = 0; c < models.length; c++) {
+    const M = models[c];
+    const x = r - M.mr, y = g - M.mg, w = b - M.mb;
+    const q = x * (M.i00 * x + M.i01 * y + M.i02 * w) + y * (M.i01 * x + M.i11 * y + M.i12 * w) + w * (M.i02 * x + M.i12 * y + M.i22 * w);
+    const v = M.k - 0.5 * q;
+    terms.push(v);
+    if (v > best) best = v;
+  }
+  let s = 0;
+  for (let c = 0; c < terms.length; c++) s += Math.exp(terms[c] - best);
+  return -(best + Math.log(s)) + 2.7568;
+}
+
+function smartBest(models, r, g, b) {
+  let best = -Infinity, bk = 0;
+  for (let c = 0; c < models.length; c++) {
+    const M = models[c];
+    const x = r - M.mr, y = g - M.mg, w = b - M.mb;
+    const q = x * (M.i00 * x + M.i01 * y + M.i02 * w) + y * (M.i01 * x + M.i11 * y + M.i12 * w) + w * (M.i02 * x + M.i12 * y + M.i22 * w);
+    const v = M.k - 0.5 * q;
+    if (v > best) { best = v; bk = c; }
+  }
+  return bk;
+}
+
+function smartSegment(rgb, W, H, box, seed, opt) {
+  opt = opt || {};
+  const grow = !!(seed && opt.grow);
+  const K = 5, GAMMA = 50, HARD = 1e7, GRID = 160;
+  const rnd = smartRand(0x9e3779b9);
+  let bx0 = Math.max(0, Math.floor(box.x)), by0 = Math.max(0, Math.floor(box.y));
+  let bx1 = Math.min(W, Math.ceil(box.x + box.w)), by1 = Math.min(H, Math.ceil(box.y + box.h));
+  if (bx1 - bx0 < 3 || by1 - by0 < 3) return null;
+  let rx0, ry0, rx1, ry1;
+  if (seed) {
+    rx0 = 0; ry0 = 0; rx1 = W; ry1 = H;
+  } else {
+    const pad = Math.round(0.15 * Math.max(bx1 - bx0, by1 - by0)) + 4;
+    rx0 = Math.max(0, bx0 - pad); ry0 = Math.max(0, by0 - pad);
+    rx1 = Math.min(W, bx1 + pad); ry1 = Math.min(H, by1 + pad);
+  }
+  const inside = (x, y) => x >= bx0 && x < bx1 && y >= by0 && y < by1;
+  let outside = 0;
+  for (let y = 0; y < H; y += 2) for (let x = 0; x < W; x += 2) if (!inside(x, y)) outside++;
+  if (outside < 60) {
+    const m = Math.max(2, Math.round(0.03 * Math.min(bx1 - bx0, by1 - by0)));
+    bx0 += m; by0 += m; bx1 -= m; by1 -= m;
+    if (bx1 - bx0 < 3 || by1 - by0 < 3) return null;
+  }
+  const RW = rx1 - rx0, RH = ry1 - ry0;
+  const s = Math.min(1, GRID / Math.max(RW, RH));
+  const gw = Math.max(2, Math.round(RW * s)), gh = Math.max(2, Math.round(RH * s));
+  const sx = RW / gw, sy = RH / gh;
+  const n = gw * gh;
+  const z = new Float64Array(n * 3);
+  for (let gy = 0; gy < gh; gy++) {
+    const y0 = ry0 + Math.floor(gy * sy), y1 = Math.max(y0 + 1, ry0 + Math.floor((gy + 1) * sy));
+    for (let gx = 0; gx < gw; gx++) {
+      const x0 = rx0 + Math.floor(gx * sx), x1 = Math.max(x0 + 1, rx0 + Math.floor((gx + 1) * sx));
+      let r = 0, g = 0, b = 0, c = 0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const j = (y * W + x) * 3;
+        r += rgb[j]; g += rgb[j + 1]; b += rgb[j + 2]; c++;
+      }
+      const i = (gy * gw + gx) * 3;
+      z[i] = r / c; z[i + 1] = g / c; z[i + 2] = b / c;
+    }
+  }
+  const HARD_BG = 0, HARD_FG = 1, UNKNOWN = 2;
+  const tri = new Uint8Array(n);
+  const alpha = new Uint8Array(n);
+  const seedR = seed ? Math.max(3, 0.025 * Math.min(W, H)) : 0;
+  for (let gy = 0, i = 0; gy < gh; gy++) {
+    const cy = ry0 + (gy + 0.5) * sy;
+    for (let gx = 0; gx < gw; gx++, i++) {
+      const cx = rx0 + (gx + 0.5) * sx;
+      if (seed && Math.hypot(cx - seed.x, cy - seed.y) <= seedR) { tri[i] = HARD_FG; alpha[i] = 1; }
+      else if (inside(cx, cy)) { tri[i] = UNKNOWN; alpha[i] = grow ? 0 : 1; }
+      else { tri[i] = opt.soft && !seed ? UNKNOWN : HARD_BG; alpha[i] = 0; }
+    }
+  }
+  let unknown = 0, boxed = 0;
+  for (let i = 0; i < n; i++) if (tri[i] === UNKNOWN) { unknown++; if (alpha[i]) boxed++; }
+  if (!unknown || (!seed && !boxed)) return null;
+  const extra = [];
+  const bw = Math.max(1, Math.round(sx)), bh = Math.max(1, Math.round(sy));
+  const cells = (W / bw) * (H / bh);
+  const hop = Math.max(1, Math.ceil(Math.sqrt(cells / 6000)));
+  for (let y = 0; y + bh <= H; y += bh * hop) for (let x = 0; x + bw <= W; x += bw * hop) {
+    if (x + bw > rx0 && x < rx1 && y + bh > ry0 && y < ry1) continue;
+    let r = 0, g = 0, b = 0;
+    for (let yy = y; yy < y + bh; yy++) for (let xx = x; xx < x + bw; xx++) {
+      const j = (yy * W + xx) * 3;
+      r += rgb[j]; g += rgb[j + 1]; b += rgb[j + 2];
+    }
+    const c = bw * bh;
+    extra.push(r / c, g / c, b / c);
+  }
+  const ne = extra.length / 3;
+  const zz = new Float64Array((n + ne) * 3);
+  zz.set(z, 0);
+  zz.set(extra, n * 3);
+  const comp = new Uint8Array(n + ne);
+  const dirs = [[1, 0, 1], [0, 1, 1], [1, 1, Math.SQRT1_2], [-1, 1, Math.SQRT1_2]];
+  let pairs = 0, diffSum = 0;
+  for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+    const i = gy * gw + gx;
+    for (const [dx, dy] of dirs) {
+      const x2 = gx + dx, y2 = gy + dy;
+      if (x2 < 0 || x2 >= gw || y2 >= gh) continue;
+      const j = y2 * gw + x2;
+      const dr = z[i * 3] - z[j * 3], dg = z[i * 3 + 1] - z[j * 3 + 1], db = z[i * 3 + 2] - z[j * 3 + 2];
+      diffSum += dr * dr + dg * dg + db * db;
+      pairs++;
+    }
+  }
+  const beta = diffSum > 0 ? pairs / (2 * diffSum) : 0;
+  const deg = new Int32Array(n + 1);
+  for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+    const i = gy * gw + gx;
+    for (const [dx, dy] of dirs) {
+      const x2 = gx + dx, y2 = gy + dy;
+      if (x2 < 0 || x2 >= gw || y2 >= gh) continue;
+      deg[i + 1]++; deg[y2 * gw + x2 + 1]++;
+    }
+  }
+  for (let i = 0; i < n; i++) deg[i + 1] += deg[i];
+  const st = deg, fill = st.slice(0, n);
+  const head = new Int32Array(pairs * 2), sis = new Int32Array(pairs * 2);
+  const base = new Float64Array(pairs * 2);
+  for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+    const i = gy * gw + gx;
+    for (const [dx, dy, wd] of dirs) {
+      const x2 = gx + dx, y2 = gy + dy;
+      if (x2 < 0 || x2 >= gw || y2 >= gh) continue;
+      const j = y2 * gw + x2;
+      const dr = z[i * 3] - z[j * 3], dg = z[i * 3 + 1] - z[j * 3 + 1], db = z[i * 3 + 2] - z[j * 3 + 2];
+      const w = GAMMA * wd * Math.exp(-beta * (dr * dr + dg * dg + db * db));
+      const a = fill[i]++, b = fill[j]++;
+      head[a] = j; head[b] = i; sis[a] = b; sis[b] = a; base[a] = w; base[b] = w;
+    }
+  }
+  const fgList = [], bgList = [];
+  const lists = () => {
+    fgList.length = 0; bgList.length = 0;
+    for (let i = 0; i < n; i++) (alpha[i] ? fgList : bgList).push(i);
+    for (let i = n; i < n + ne; i++) bgList.push(i);
+  };
+  lists();
+  if (!fgList.length || bgList.length < K) return null;
+  smartKmeans(zz, fgList, Math.min(K, fgList.length), comp, rnd);
+  smartKmeans(zz, bgList, K, comp, rnd);
+  let fgM = smartFit(zz, fgList, comp, K), bgM = smartFit(zz, bgList, comp, K);
+  const cap = new Float64Array(pairs * 2), tr = new Float64Array(n);
+  for (let iter = 0; iter < 4; iter++) {
+    if (iter) {
+      for (const p of fgList) comp[p] = smartBest(fgM, zz[p * 3], zz[p * 3 + 1], zz[p * 3 + 2]);
+      for (const p of bgList) comp[p] = smartBest(bgM, zz[p * 3], zz[p * 3 + 1], zz[p * 3 + 2]);
+      fgM = smartFit(zz, fgList, comp, K);
+      bgM = smartFit(zz, bgList, comp, K);
+    }
+    if (!fgM.length || !bgM.length) break;
+    for (let i = 0; i < n; i++) {
+      if (tri[i] === HARD_BG) tr[i] = -HARD;
+      else if (tri[i] === HARD_FG) tr[i] = HARD;
+      else {
+        const r = z[i * 3], g = z[i * 3 + 1], b = z[i * 3 + 2];
+        tr[i] = smartCost(bgM, r, g, b) - smartCost(fgM, r, g, b);
+      }
+    }
+    cap.set(base);
+    const lab = smartMaxflow(n, st, head, sis, cap, tr);
+    let changed = 0;
+    for (let i = 0; i < n; i++) {
+      if (tri[i] !== UNKNOWN) continue;
+      if (alpha[i] !== lab[i]) { alpha[i] = lab[i]; changed++; }
+    }
+    lists();
+    if (!fgList.length) return null;
+    if (iter && changed < unknown * 0.004) break;
+  }
+  let edgeFg = 0;
+  if (!seed && !opt.soft) {
+    let ring = 0, hit = 0;
+    for (let gy = 0, i = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++, i++) {
+      if (tri[i] !== HARD_BG) continue;
+      const near = (gx > 0 && tri[i - 1] === UNKNOWN) || (gx < gw - 1 && tri[i + 1] === UNKNOWN) ||
+                   (gy > 0 && tri[i - gw] === UNKNOWN) || (gy < gh - 1 && tri[i + gw] === UNKNOWN);
+      if (!near) continue;
+      ring++;
+      if (smartCost(fgM, z[i * 3], z[i * 3 + 1], z[i * 3 + 2]) < smartCost(bgM, z[i * 3], z[i * 3 + 1], z[i * 3 + 2])) hit++;
+    }
+    edgeFg = ring ? hit / ring : 0;
+  }
+  let seedLooksBg = false;
+  if (seed && !grow) {
+    const gx = Math.min(gw - 1, Math.max(0, Math.floor((seed.x - rx0) / sx)));
+    const gy = Math.min(gh - 1, Math.max(0, Math.floor((seed.y - ry0) / sy)));
+    const i = (gy * gw + gx) * 3;
+    seedLooksBg = smartCost(bgM, z[i], z[i + 1], z[i + 2]) < smartCost(fgM, z[i], z[i + 1], z[i + 2]);
+  }
+  const mask = new Uint8Array(W * H);
+  const aAt = (gx, gy) => alpha[Math.min(gh - 1, Math.max(0, gy)) * gw + Math.min(gw - 1, Math.max(0, gx))];
+  for (let y = Math.max(ry0, by0); y < Math.min(ry1, by1); y++) {
+    const fy = (y - ry0 + 0.5) / sy - 0.5, y0 = Math.floor(fy), ty = fy - y0;
+    for (let x = Math.max(rx0, bx0); x < Math.min(rx1, bx1); x++) {
+      const fx = (x - rx0 + 0.5) / sx - 0.5, x0 = Math.floor(fx), tx = fx - x0;
+      const a = (aAt(x0, y0) * (1 - tx) + aAt(x0 + 1, y0) * tx) * (1 - ty) +
+                (aAt(x0, y0 + 1) * (1 - tx) + aAt(x0 + 1, y0 + 1) * tx) * ty;
+      const k = y * W + x;
+      if (a >= 0.85) mask[k] = 1;
+      else if (a > 0.15) {
+        const j = k * 3;
+        mask[k] = smartCost(fgM, rgb[j], rgb[j + 1], rgb[j + 2]) < smartCost(bgM, rgb[j], rgb[j + 1], rgb[j + 2]) ? 1 : 0;
+      }
+    }
+  }
+  if (seed) {
+    const r2 = seedR * seedR;
+    for (let y = Math.max(0, Math.floor(seed.y - seedR)); y <= Math.min(H - 1, seed.y + seedR); y++)
+      for (let x = Math.max(0, Math.floor(seed.x - seedR)); x <= Math.min(W - 1, seed.x + seedR); x++)
+        if ((x - seed.x) ** 2 + (y - seed.y) ** 2 <= r2 && inside(x, y)) mask[y * W + x] = 1;
+  }
+  smartTidy(mask, W, H, rx0, ry0, rx1, ry1, seed);
+  mask.seedLooksBg = seedLooksBg;
+  mask.edgeFg = edgeFg;
+  return mask;
+}
+
+function smartCount(m) {
+  let n = 0;
+  if (m) for (let k = 0; k < m.length; k++) n += m[k];
+  return n;
+}
+
+function smartSelectMask(rgb, W, H, box, seed) {
+  if (seed) {
+    const all = { x: 0, y: 0, w: W, h: H };
+    const first = smartSegment(rgb, W, H, all, seed);
+    if (first && !first.seedLooksBg && smartCount(first) > 0) return first;
+    return smartSegment(rgb, W, H, all, seed, { grow: true }) || first;
+  }
+  const hard = smartSegment(rgb, W, H, box, null);
+  if (hard && hard.edgeFg < 0.05 && smartCount(hard) >= 0.02 * box.w * box.h) return hard;
+  const soft = smartSegment(rgb, W, H, box, null, { soft: true });
+  if (!soft) return hard;
+  if (!hard) return soft;
+  return smartCount(hard) < 0.5 * smartCount(soft) ? soft : hard;
+}
+
+function smartTidy(mask, W, H, rx0, ry0, rx1, ry1, seed) {
+  const lab = new Int32Array(W * H).fill(-1);
+  const stack = [];
+  const sizes = [], touches = [];
+  const flood = (start, val, id) => {
+    let size = 0, touch = false;
+    stack.push(start); lab[start] = id;
+    while (stack.length) {
+      const k = stack.pop();
+      size++;
+      const x = k % W, y = (k - x) / W;
+      if (x === rx0 || y === ry0 || x === rx1 - 1 || y === ry1 - 1) touch = true;
+      if (x > rx0 && lab[k - 1] < 0 && mask[k - 1] === val) { lab[k - 1] = id; stack.push(k - 1); }
+      if (x < rx1 - 1 && lab[k + 1] < 0 && mask[k + 1] === val) { lab[k + 1] = id; stack.push(k + 1); }
+      if (y > ry0 && lab[k - W] < 0 && mask[k - W] === val) { lab[k - W] = id; stack.push(k - W); }
+      if (y < ry1 - 1 && lab[k + W] < 0 && mask[k + W] === val) { lab[k + W] = id; stack.push(k + W); }
+    }
+    sizes[id] = size; touches[id] = touch;
+  };
+  let id = 0;
+  const fgIds = [];
+  for (let y = ry0; y < ry1; y++) for (let x = rx0; x < rx1; x++) {
+    const k = y * W + x;
+    if (mask[k] && lab[k] < 0) { flood(k, 1, id); fgIds.push(id); id++; }
+  }
+  if (!fgIds.length) return;
+  let keep;
+  if (seed) {
+    const sk = Math.round(seed.y) * W + Math.round(seed.x);
+    const sid = mask[sk] ? lab[sk] : -1;
+    keep = c => c === sid;
+  } else {
+    let big = 0;
+    for (const c of fgIds) if (sizes[c] > big) big = sizes[c];
+    const min = Math.max(12, 0.03 * big);
+    keep = c => sizes[c] >= min;
+  }
+  let fgCount = 0;
+  for (let y = ry0; y < ry1; y++) for (let x = rx0; x < rx1; x++) {
+    const k = y * W + x;
+    if (!mask[k]) continue;
+    if (keep(lab[k])) fgCount++; else mask[k] = 0;
+  }
+  lab.fill(-1);
+  const holeMax = Math.max(16, 0.01 * fgCount);
+  const holes = [];
+  for (let y = ry0; y < ry1; y++) for (let x = rx0; x < rx1; x++) {
+    const k = y * W + x;
+    if (!mask[k] && lab[k] < 0) { flood(k, 0, id); if (!touches[id] && sizes[id] <= holeMax) holes.push(id); id++; }
+  }
+  if (!holes.length) return;
+  const fill = new Set(holes);
+  for (let y = ry0; y < ry1; y++) for (let x = rx0; x < rx1; x++) {
+    const k = y * W + x;
+    if (!mask[k] && fill.has(lab[k])) mask[k] = 1;
+  }
+}
+
+function smartPixels() {
+  const t = makeCanvas(W, H, true), c = t.getContext('2d');
+  c.fillStyle = $('bg-transparent').checked ? '#808080' : $('bg-color').value;
+  c.fillRect(0, 0, W, H);
+  renderFrame(c, F());
+  const d = c.getImageData(0, 0, W, H).data;
+  const rgb = new Uint8Array(W * H * 3);
+  for (let k = 0, j = 0; k < W * H; k++, j += 4) {
+    rgb[k * 3] = d[j]; rgb[k * 3 + 1] = d[j + 1]; rgb[k * 3 + 2] = d[j + 2];
+  }
+  return rgb;
+}
+
+let smartBusy = false;
+async function smartRun(g) {
+  if (smartBusy || !g) return;
+  const xs = g.pts.map(q => q.x), ys = g.pts.map(q => q.y);
+  const x0 = Math.max(0, Math.min(...xs)), x1 = Math.min(W, Math.max(...xs));
+  const y0 = Math.max(0, Math.min(...ys)), y1 = Math.min(H, Math.max(...ys));
+  const click = x1 - x0 < 6 && y1 - y0 < 6;
+  const sx = Math.max(0, Math.min(W - 1, g.x)), sy = Math.max(0, Math.min(H - 1, g.y));
+  smartBusy = true;
+  view.style.cursor = 'progress';
+  progress(0.35, click ? 'Finding the thing you clicked…' : 'Finding the thing in your box…');
+  await tick();
+  await tick();
+  let mask = null;
+  try {
+    mask = smartSelectMask(smartPixels(), W, H,
+      click ? null : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 },
+      click ? { x: sx, y: sy } : null);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    smartBusy = false;
+    progress(-1);
+    setTool(tool, shape);
+  }
+  if (tool !== 'smart') return;
+  const prev = g.prev;
+  if (g.op !== 'new' && prev) {
+    if (!mask) mask = prev;
+    else if (g.op === 'add') for (let k = 0; k < mask.length; k++) mask[k] = mask[k] | prev[k];
+    else for (let k = 0; k < mask.length; k++) mask[k] = prev[k] && !mask[k] ? 1 : 0;
+  }
+  let n = 0;
+  if (mask) for (let k = 0; k < mask.length; k++) n += mask[k];
+  if (!n) {
+    setPixSelMask(null);
+    toast(g.op === 'sub' ? 'That removed the whole selection.'
+      : click ? 'Could not pick out a thing there. Try dragging a box around it.'
+      : 'Could not find a thing in that box. Try a box that fits it more closely.', 'bad');
+    return;
+  }
+  setPixSelMask(mask, 'Smart');
+  if (g.op === 'new') flash('Selected. Drag it to move it, or use To object.');
 }
 
 /* ============================================================ magic wand */
@@ -5398,7 +6001,7 @@ function setTimelineSize(px) {
 const TOOL_NAMES = { select: 'Select', brush: 'Brush', eraser: 'Eraser', line: 'Line', rect: 'Rectangle',
   ellipse: 'Ellipse', fill: 'Fill', text: 'Text', eyedrop: 'Picker', spray: 'Spray', smudge: 'Smudge',
   pan: 'Pan', crop: 'Crop', stamp: 'Stamp',
-  marquee: 'Marquee', lasso: 'Lasso', wand: 'Magic wand' };
+  marquee: 'Marquee', lasso: 'Lasso', wand: 'Magic wand', smart: 'Smart select' };
 function updateStatus() {
   if (!frames.length) return;
   const ms = frames.reduce((n, f) => n + f.delay, 0);
@@ -5613,6 +6216,7 @@ const COMMANDS = [
   { g: 'Tool', n: 'Marquee — select pixels', k: 'M', r: () => setTool('marquee') },
   { g: 'Tool', n: 'Lasso — select pixels freehand', k: 'Q', r: () => setTool('lasso') },
   { g: 'Tool', n: 'Magic wand — select by colour', k: 'W', r: () => setTool('wand') },
+  { g: 'Tool', n: 'Smart select — pick out a thing in a picture', k: 'J', r: () => setTool('smart') },
   { g: 'Edit', n: 'Lift the selected pixels to an object', r: () => pixToObject(true) },
   { g: 'Edit', n: 'Copy the selected pixels', k: 'Ctrl+C', r: pixCopy },
   { g: 'Edit', n: 'Cut the selected pixels', k: 'Ctrl+X', r: () => { pixCopy(); pixDelete(); } },
