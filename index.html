@@ -229,7 +229,7 @@ html[data-theme="light"] .stage .viewport{--stagebg:#dbe0e9}
 .zoombar #scrub{flex:1;min-width:80px}
 .zoombar .sep{width:1px;height:18px;background:var(--line);flex:0 0 auto}
 #statusbar .hint{min-height:0;text-align:left;color:var(--text);opacity:.85;
-  max-width:46ch;overflow:hidden;text-overflow:ellipsis}
+  white-space:normal;line-height:1.4;margin-top:4px;padding-top:6px;border-top:1px solid var(--line)}
 
 /* ---- brand ---- */
 .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:inherit;flex:0 0 auto}
@@ -272,12 +272,11 @@ html[data-theme="light"] .stage .viewport{--stagebg:#dbe0e9}
 #tl-head button{padding:2px 9px;line-height:1.1}
 #tl-head .readout{font-variant-numeric:tabular-nums;min-width:38px;text-align:center}
 #tl-head .hintish{margin-left:auto;opacity:.75}
-#statusbar{grid-column:1/-1;display:flex;align-items:center;gap:14px;padding:6px 10px;
-  font-size:11.5px;color:var(--muted);background:var(--panel);border:1px solid var(--line);
-  border-radius:var(--radius);font-variant-numeric:tabular-nums;overflow-x:auto;white-space:nowrap}
-#statusbar .grow{flex:1}
-#statusbar span:not(.grow){position:relative}
-#statusbar span:not(.grow)+span:not(.grow)::before{content:'';position:absolute;left:-8px;top:2px;bottom:2px;width:1px;background:var(--line)}
+#statusbar{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;
+  font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+#statusbar span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#statusbar .hint,#statusbar #st-export{grid-column:1/-1}
+#statusbar #st-export{white-space:normal;font-size:11.5px}
 
 /* ---- right-click frame menu ---- */
 .ctxmenu{position:fixed;z-index:90;min-width:206px;padding:5px;border-radius:10px;
@@ -377,7 +376,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
 @media(min-width:1101px){
   html,body{overflow:hidden}
   body{display:flex;flex-direction:column}
-  .wrap{flex:1;min-height:0;grid-template-rows:minmax(0,1fr) 10px auto var(--tlh,148px) auto;align-items:stretch}
+  .wrap{flex:1;min-height:0;grid-template-rows:minmax(0,1fr) 10px auto var(--tlh,148px);align-items:stretch}
   .wrap > .panel{overflow:auto;max-height:100%}
   .stage{height:100%}
   .viewport{flex:1;min-height:140px;max-height:none}
@@ -684,6 +683,20 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
   <!-- RIGHT -->
   <div class="panel props">
     <div class="sec">
+      <h3>📊 Status</h3>
+      <div id="statusbar">
+        <span id="st-frame">Frame 1 / 1</span>
+        <span id="st-size">500 × 500</span>
+        <span id="st-fps">8.3 fps</span>
+        <span id="st-len">0.12s</span>
+        <span id="st-layers">1 layer</span>
+        <span id="st-zoom">100%</span>
+        <span id="st-tool">Brush</span>
+        <span id="st-export">No export yet</span>
+        <span class="hint" id="hint">Brush selected — draw on the canvas.</span>
+      </div>
+    </div>
+    <div class="sec">
       <h3>🖼️ Canvas</h3>
       <select id="canvas-size">
         <option value="500x500">500 × 500</option>
@@ -842,18 +855,6 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <span class="hintish">Drag a frame to reorder · right-click for more</span>
   </div>
   <div class="timeline" id="timeline"></div>
-  <div id="statusbar">
-    <span id="st-frame">Frame 1 / 1</span>
-    <span id="st-size">500 × 500</span>
-    <span id="st-fps">8.3 fps</span>
-    <span id="st-len">0.12s</span>
-    <span id="st-layers">1 layer</span>
-    <span id="st-zoom">100%</span>
-    <span id="st-tool">Brush</span>
-    <span class="hint" id="hint">Brush selected — draw on the canvas.</span>
-    <span class="grow"></span>
-    <span id="st-export">—</span>
-  </div>
 </div>
 
 <footer id="credit">A Kiaan Ganesh Shetty Creation · 2026 · 30-08</footer>
