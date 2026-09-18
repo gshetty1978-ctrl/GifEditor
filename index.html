@@ -337,6 +337,40 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
 .recents{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
 .recents button{width:20px;height:20px;padding:0;border-radius:5px}
 
+#signin{z-index:95;background:var(--bg);backdrop-filter:none;overflow:auto;align-items:safe center}
+#si-bg{position:fixed;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+#signin .sheet{position:relative;width:min(420px,100%);text-align:center;padding:28px 24px 20px;
+  overflow:visible;max-height:none;background:color-mix(in srgb,var(--panel) 90%,transparent);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#signin input[type=email]{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;font:inherit}
+#signin .big{font-size:16px}
+#signin .perks{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin:14px 0 0;padding:0;list-style:none}
+#signin .perks li{font-size:11.5px;padding:3px 8px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+#signin .perks-h{margin:14px 0 0;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+#signin .why{color:var(--text);background:color-mix(in srgb,var(--accent) 16%,transparent);
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:8px;padding:8px 10px;margin:4px 0 14px;font-size:13px}
+#signin .linkish{background:none;border:none;color:var(--muted);text-decoration:underline;margin-top:10px;font-size:13px}
+#signin .linkish:hover{color:var(--text)}
+.is-guest [data-member]::after{content:'✨';font-size:.8em;margin-left:3px}
+#signin .mark{width:56px;height:56px;margin:0 auto 8px;display:block}
+#signin .mark .film{fill:var(--panel2);stroke:var(--line);stroke-width:2}
+#signin .mark .holes rect{fill:var(--accent);opacity:.55}
+#signin .mark .cel{fill:var(--accent)}
+#signin h1{margin:0;font-size:22px;font-weight:800;letter-spacing:.14em}
+#signin .tag{color:var(--muted);margin:6px 0 16px;font-size:13.5px;line-height:1.45}
+#signin .tag b{color:var(--text)}
+#signin .step{display:none}
+#signin .step.on{display:block}
+#signin .big{width:100%;font-size:16px;padding:11px 12px;text-align:center;box-sizing:border-box}
+#signin .code{letter-spacing:.45em;font-size:24px;font-variant-numeric:tabular-nums;padding-left:.45em}
+#signin .primary{width:100%;margin-top:10px;padding:11px;font-size:14px;font-weight:700}
+#signin .row2{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+#signin .row2 button{font-size:12.5px}
+#signin .err{color:#ff9d9d;min-height:18px;font-size:12.5px;margin:10px 0 0}
+#signin .fine{color:var(--muted);font-size:11.5px;margin:10px 0 0;line-height:1.4}
+#btn-me{font-weight:600}
+#w-hi{margin:6px 0 -12px;font-weight:700;color:var(--text)}
+
 /* ---- modal ---- */
 .modal{position:fixed;inset:0;background:rgba(4,6,10,.62);display:none;z-index:80;
   align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(2px)}
@@ -433,6 +467,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <input type="text" id="find" placeholder="🔎 Find a tool or setting…  ( / )" autocomplete="off" spellcheck="false">
     <div id="find-list"></div>
   </div>
+  <button id="btn-me" title="Your profile" hidden>👤 <span id="me-name"></span></button>
   <button id="btn-projects" title="Every project you have saved">🗂️ Projects</button>
   <span class="pname" id="proj-name" title="Click to rename this project">Untitled</span>
   <span class="saving" id="save-state"></span>
@@ -478,7 +513,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     <button data-tool="marquee" title="Select a rectangle of pixels — M"><i>▭</i><em>M</em></button>
     <button data-tool="lasso" title="Freehand pixel selection — Q"><i>✎</i><em>Q</em></button>
     <button data-tool="wand" title="Select every pixel of a similar colour — W"><i>🪄</i><em>W</em></button>
-    <button data-tool="smart" title="Smart select — drag a box around a thing in a picture, or just click it. Shift adds, Alt removes — J"><i>✨</i><em>J</em></button>
+    <button data-tool="smart" data-member title="Smart select — drag a box around a thing in a picture, or just click it. Shift adds, Alt removes — J"><i>✨</i><em>J</em></button>
     <hr>
     <button data-tool="eyedrop" title="Colour picker — I"><i>💧</i><em>I</em></button>
     <button data-tool="crop" title="Crop the canvas — C"><i>✂</i><em>C</em></button>
@@ -546,7 +581,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <button id="sel-reset" title="Reset rotation">↺ 0°</button>
         <button id="sel-del" class="danger" title="Delete (Del)">🗑️ Delete</button>
       </div>
-      <button id="sel-continue" class="green" style="width:100%;margin-top:6px" title="Carry on the movement of the last three frames into new ones">↝ Continue motion</button>
+      <button id="sel-continue" data-member class="green" style="width:100%;margin-top:6px" title="Carry on the movement of the last three frames into new ones">↝ Continue motion</button>
       <label class="row">Direction <select id="cont-dir" style="width:118px" title="Auto follows the path it is already on, curve and all. The rest force a straight axis.">
         <option value="auto">Auto (as drawn)</option>
         <option value="right">→ Right</option>
@@ -630,7 +665,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
       </select>
       <span style="width:1px;height:22px;background:var(--line)"></span>
-      <button id="btn-tween" title="Insert interpolated frames between this frame and the next">&#8669; Tween</button>
+      <button id="btn-tween" data-member title="Insert interpolated frames between this frame and the next">&#8669; Tween</button>
       <input type="number" id="tween-n" value="4" min="1" max="60" style="width:56px" title="How many in-between frames">
       <select id="tween-ease" style="width:104px" title="How the motion is paced">
         <option value="linear">Linear</option>
@@ -732,7 +767,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <option value="frame" selected>This frame</option>
         <option value="all">Every frame</option>
       </select></label>
-      <button id="btn-fx" class="violet" style="width:100%;margin-top:6px">🎨 Adjust &amp; filter…</button>
+      <button id="btn-fx" data-member class="violet" style="width:100%;margin-top:6px">🎨 Adjust &amp; filter…</button>
       <p class="note">Flipping bakes that layer's shapes and text into pixels first. Rotating 90° turns the whole project and swaps the canvas dimensions.</p>
     </div>
     <div class="sec">
@@ -817,13 +852,13 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <label class="row">Skip identical <input type="checkbox" id="dedupe" checked title="Merge runs of identical frames into one longer frame"></label>
       <div class="grid2" style="margin-top:8px">
         <button id="btn-png" title="Save the current frame as a PNG">🖼️ PNG frame</button>
-        <button id="btn-sheet" title="Save every frame side by side in one PNG">🎞️ Sprite sheet</button>
+        <button id="btn-sheet" data-member title="Save every frame side by side in one PNG">🎞️ Sprite sheet</button>
       </div>
       <div class="grid2" style="margin-top:6px">
-        <button id="btn-zip" title="Save every frame as a separate PNG">📦 All frames</button>
-        <button id="btn-webm" title="Record the animation as a true-colour WebM video">🎥 WebM video</button>
+        <button id="btn-zip" data-member title="Save every frame as a separate PNG">📦 All frames</button>
+        <button id="btn-webm" data-member title="Record the animation as a true-colour WebM video">🎥 WebM video</button>
       </div>
-      <button id="btn-apng" style="width:100%;margin-top:6px" title="Animated PNG — lossless, every colour, real transparency">🌈 Animated PNG</button>
+      <button id="btn-apng" data-member style="width:100%;margin-top:6px" title="Animated PNG — lossless, every colour, real transparency">🌈 Animated PNG</button>
       <p class="note">GIF caps out at 256 colours; WebM keeps every one, and PNG frames are lossless.</p>
     </div>
     <div class="sec">
@@ -877,6 +912,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <rect class="cel" x="19" y="19" width="26" height="26" rx="4"/>
     </svg>
     <h1>FRAME STUDIO</h1>
+    <p class="tag" id="w-hi" hidden></p>
     <p class="tag">Draw animated GIFs frame by frame. Everything runs in this tab — nothing is ever uploaded.</p>
     <div class="wcards">
       <div class="wcard resume" id="w-resume" style="display:none">
@@ -892,6 +928,53 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
       <label><input type="checkbox" id="w-skip"> Skip this next time</label>
       <button id="w-close">Straight to the editor →</button>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="signin">
+  <canvas id="si-bg" aria-hidden="true"></canvas>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Sign in to Frame Studio">
+    <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+      <rect x="1" y="9" width="62" height="46" rx="7" class="film"/>
+      <g class="holes">
+        <rect x="6" y="15" width="7" height="7" rx="2"/><rect x="6" y="28" width="7" height="7" rx="2"/><rect x="6" y="41" width="7" height="7" rx="2"/>
+        <rect x="51" y="15" width="7" height="7" rx="2"/><rect x="51" y="28" width="7" height="7" rx="2"/><rect x="51" y="41" width="7" height="7" rx="2"/>
+      </g>
+      <rect class="cel" x="19" y="19" width="26" height="26" rx="4"/>
+    </svg>
+    <h1>FRAME STUDIO</h1>
+    <form class="step on" id="si-email" novalidate>
+      <p class="tag">Sign in with your email to start making GIFs.</p>
+      <p class="why" id="si-why" hidden></p>
+      <input class="big" type="email" id="si-email-in" placeholder="you@gmail.com" autocomplete="email" spellcheck="false">
+      <button class="primary green" type="submit" id="si-send">Send me a code</button>
+      <button type="button" class="linkish" id="si-guest">Continue as a guest</button>
+      <p class="perks-h">Members get</p>
+      <ul class="perks">
+        <li>✨ Smart select</li><li>🎨 Adjust &amp; filters</li><li>⇝ Tween &amp; motion</li>
+        <li>🎥 Video &amp; APNG</li><li>🎞️ Sprite sheets</li><li>♾️ Unlimited exports</li>
+      </ul>
+      <p class="fine">Guests can draw with every other tool, import as much as they like, and export 10 times.</p>
+    </form>
+    <form class="step" id="si-code" novalidate>
+      <p class="tag">We emailed a 6-digit code to <b id="si-to"></b>. It works for 10 minutes. Check spam if it is not there.</p>
+      <input class="big code" id="si-code-in" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="000000">
+      <button class="primary green" type="submit" id="si-verify">Verify</button>
+      <div class="row2"><button type="button" id="si-resend">Resend code</button><button type="button" id="si-back">Use a different email</button></div>
+    </form>
+    <form class="step" id="si-name" novalidate>
+      <p class="tag">You are in! What should we call you?</p>
+      <input class="big" id="si-name-in" maxlength="30" placeholder="Your name" autocomplete="nickname">
+      <button class="primary green" type="submit" id="si-name-go">Start making GIFs →</button>
+    </form>
+    <form class="step" id="si-me" novalidate>
+      <p class="tag">Signed in as <b id="si-me-email"></b></p>
+      <input class="big" id="si-me-name" maxlength="30" placeholder="Your name" autocomplete="nickname">
+      <button class="primary green" type="submit" id="si-me-save">Save name</button>
+      <div class="row2"><button type="button" id="si-out" class="danger">Sign out</button><button type="button" id="si-me-close">Close</button></div>
+    </form>
+    <p class="err" id="si-err" role="alert"></p>
+    <p class="fine">Your email is only used to send the code and keep your profile. Your GIFs stay in this browser.</p>
   </div>
 </div>
 
@@ -1822,6 +1905,7 @@ function countTweenable(A, B) {
   return n;
 }
 function tween(steps) {
+  if (needMember('tween')) return;
   stopPlay();
   const A = F(), B = frames[cur + 1];
   if (!B) { toast('Add a frame after this one to tween into.', 'bad'); return; }
@@ -1889,6 +1973,7 @@ function stopPlay() {
 
 /* ------------------------------------------------------------ tool setup */
 function setTool(t, sh) {
+  if (t === 'smart' && needMember('smart')) return;
   if (typeof pixFloat !== 'undefined' && pixFloat && t !== tool) dropPixels();
   if (t !== 'marquee' && t !== 'lasso' && t !== 'wand' && t !== 'smart' && typeof pixSel !== 'undefined' && pixSel) setPixSelMask(null);
   tool = t; shape = sh || null;
@@ -2699,6 +2784,7 @@ function sameImage(a, b) {
 }
 
 async function exportGIF() {
+  if (!guestExportOk()) return;
   stopPlay();
   const keep = sel; sel = -1;
   const scale = +$('export-scale').value;
@@ -2859,6 +2945,7 @@ function progress(v, msg) {
   if (msg) $('hint').textContent = msg;
 }
 function download(blob, name) {
+  if (!isMember() && !/\.json$/i.test(name)) guestExportUsed();
   noteExport(name, blob.size);          // the status bar reports what last left the app
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -3913,6 +4000,7 @@ function fxReset() {
   fxSync();
 }
 function fxOpen() {
+  if (needMember('fx')) return;
   if (!frames.length) return;
   fxReset();
   $('fx-modal').classList.add('open');
@@ -3980,6 +4068,7 @@ function outSize() {
 }
 const toBlob = (cv, type, q) => new Promise(r => cv.toBlob(r, type || 'image/png', q));
 async function exportPNG() {
+  if (!guestExportOk()) return;
   stopPlay();
   const keep = sel; sel = -1;
   const [ow, oh] = outSize();
@@ -3989,6 +4078,7 @@ async function exportPNG() {
   toast('Saved frame ' + (cur + 1) + ' as PNG — ' + (blob.size / 1024).toFixed(0) + ' KB.', 'good');
 }
 async function exportSheet() {
+  if (needMember('sheet')) return;
   stopPlay();
   const keep = sel; sel = -1;
   const [ow, oh] = outSize();
@@ -4066,6 +4156,7 @@ function zipStore(files) {
   return new Blob([...chunks, ...central, end], { type: 'application/zip' });
 }
 async function exportAllPNGs() {
+  if (needMember('zip')) return;
   stopPlay();
   const keep = sel; sel = -1;
   const [ow, oh] = outSize();
@@ -4088,6 +4179,7 @@ async function exportAllPNGs() {
 /* WebM keeps every colour, which GIF cannot. MediaRecorder timestamps by wall
    clock, so the animation genuinely has to play once while it records. */
 async function exportWebM() {
+  if (needMember('webm')) return;
   if (typeof MediaRecorder === 'undefined') { toast('This browser has no MediaRecorder — WebM is unavailable.', 'bad'); return; }
   stopPlay();
   const [ow, oh] = outSize();
@@ -5598,6 +5690,7 @@ function motionTrail(id, max) {
   return trail;
 }
 function continueMotion(count) {
+  if (needMember('motion')) return;
   const o = selObj();
   if (!o) { toast('Select the shape, text or image you want to carry on.', 'bad'); return; }
   if (L().shared) { toast('That layer is shared with every frame, so the object cannot move frame to frame. Unshare it first.', 'bad'); return; }
@@ -5954,6 +6047,8 @@ function openWelcome() {
     $('w-resume').style.display = 'none';
   }
   $('w-skip').checked = welcomeSkipped();
+  $('w-hi').hidden = !authSession;
+  if (authSession) $('w-hi').textContent = 'Hi ' + authSession.name + '! 👋';
   $('welcome').classList.add('open');
 }
 function newProject(w, h) {
@@ -6142,6 +6237,7 @@ function rawScanlines(img, w, h) {
   return out;
 }
 async function exportAPNG() {
+  if (needMember('apng')) return;
   if (typeof CompressionStream === 'undefined') { toast('This browser has no CompressionStream, so APNG is unavailable.', 'bad'); return; }
   stopPlay();
   const keep = sel; sel = -1;
@@ -6285,6 +6381,7 @@ const COMMANDS = [
   { g: 'File', n: 'Projects \u2014 everything saved here', r: openProjects },
   { g: 'File', n: 'Rename this project', r: renameProject },
   { g: 'File', n: 'Show the welcome screen', r: openWelcome },
+  { g: 'File', n: 'My profile — change name or sign out', r: () => openSignin('si-me') },
   { g: 'File', n: 'Import GIF or images…', r: () => $('file-img').click() },
   { g: 'File', n: 'Import a video as frames…', r: () => $('file-video').click() },
   { g: 'File', n: 'Load a reference image…', r: () => $('file-ref').click() },
@@ -6434,6 +6531,11 @@ $('btn-apng').onclick = guard(exportAPNG, 'APNG export');
 
 /* Shortcuts that must work even while a panel field has focus. */
 window.addEventListener('keydown', e => {
+  if (signinOpen()) {
+    if (e.key === 'Escape' && (authSession || guestMode())) closeSignin();
+    e.stopImmediatePropagation();
+    return;
+  }
   const k = e.key.toLowerCase();
   const inField = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '');
   if (e.key === 'Tab' && !inField && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); toggleFocus(); return; }
@@ -6447,6 +6549,417 @@ window.addEventListener('keydown', e => {
     if ($('fx-modal').classList.contains('open')) { fxClose(); return; }
   }
 }, true);
+
+const AUTH_URL = 'https://script.google.com/macros/s/AKfycbyFSvvWF8FoeOWf51kFT7hGmQbP7OJQZMiDUeHqftitG2YIkl2xjJibBApo8i5aVM9a5A/exec';
+const AUTH_MSG = {
+  'bad-email': 'That does not look like an email address.',
+  'slow-down': 'Too many codes for that email. Wait 15 minutes and try again.',
+  busy: 'Too many sign-ins today. Please try again tomorrow.',
+  expired: 'That code has run out. Send a new one.',
+  'wrong-code': 'That code is not right.',
+  'too-many': 'Too many wrong tries. Send a new code.',
+  'bad-name': 'Use 1 to 30 characters.',
+  'signed-out': 'Your sign-in has run out. Please sign in again.',
+  offline: 'Could not reach the sign-in service. Check your internet and try again.',
+  'bad-request': 'Something went wrong. Please try again.'
+};
+let authSession = null, authPending = null, authBooted = false;
+let siEmail = '', siResendAt = 0, siTimer = null;
+function authLoad() {
+  try {
+    const a = JSON.parse(localStorage.getItem('fs-auth') || 'null');
+    if (a && a.token && a.name && a.exp > Date.now()) return a;
+  } catch (_) {}
+  return null;
+}
+function authSave(a) {
+  authSession = a;
+  try { a ? localStorage.setItem('fs-auth', JSON.stringify(a)) : localStorage.removeItem('fs-auth'); } catch (_) {}
+  renderMe();
+}
+const GUEST_EXPORTS = 10;
+const MEMBER_FEATURES = {
+  smart: 'Smart select', fx: 'Adjust & filter', tween: 'Tween', motion: 'Continue motion',
+  sheet: 'Sprite sheet export', zip: 'All-frames export', webm: 'WebM video export', apng: 'Animated PNG export'
+};
+function isMember() { return !!authSession; }
+function guestMode() {
+  try { return !authSession && localStorage.getItem('fs-guest') === '1'; } catch (_) { return false; }
+}
+function setGuest(on) {
+  try { on ? localStorage.setItem('fs-guest', '1') : localStorage.removeItem('fs-guest'); } catch (_) {}
+  renderMe();
+}
+function guestExportsUsed() {
+  try { return Math.max(0, +localStorage.getItem('fs-guest-exports') || 0); } catch (_) { return 0; }
+}
+function guestExportsLeft() { return Math.max(0, GUEST_EXPORTS - guestExportsUsed()); }
+function guestExportUsed() {
+  try { localStorage.setItem('fs-guest-exports', String(guestExportsUsed() + 1)); } catch (_) {}
+  renderMe();
+  const left = guestExportsLeft();
+  if (left <= 3) toast(left ? left + (left === 1 ? ' guest export' : ' guest exports') + ' left. Sign in free for unlimited.' : 'That was your last guest export. Sign in free for unlimited exports.');
+}
+function guestExportOk() {
+  if (isMember() || guestExportsLeft() > 0) return true;
+  openSignin('si-email', 'limit');
+  return false;
+}
+function needMember(key) {
+  if (isMember()) return false;
+  openSignin('si-email', 'feature', MEMBER_FEATURES[key] || 'That');
+  return true;
+}
+function renderMe() {
+  const guest = guestMode();
+  $('btn-me').hidden = !authSession && !guest;
+  $('me-name').textContent = authSession ? authSession.name
+    : guest ? 'Guest · ' + guestExportsLeft() + ' export' + (guestExportsLeft() === 1 ? '' : 's') + ' left' : '';
+  $('btn-me').title = authSession ? 'Your profile' : 'Sign in to become a member';
+  document.body.classList.toggle('is-guest', !authSession);
+}
+async function authCall(body) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const r = await fetch(AUTH_URL, { method: 'POST', body: JSON.stringify(body), signal: ctl.signal });
+    return await r.json();
+  } catch (_) {
+    return { ok: false, error: 'offline' };
+  } finally {
+    clearTimeout(t);
+  }
+}
+function authMsg(r) {
+  if (r.error === 'wrong-code' && r.left) return AUTH_MSG['wrong-code'] + ' ' + r.left + (r.left === 1 ? ' try' : ' tries') + ' left.';
+  return AUTH_MSG[r.error] || AUTH_MSG['bad-request'];
+}
+function signinOpen() { return $('signin').classList.contains('open'); }
+function siErr(m) { $('si-err').textContent = m || ''; }
+function siStep(id) {
+  document.querySelectorAll('#signin .step').forEach(f => f.classList.toggle('on', f.id === id));
+  siErr('');
+  const f = $(id).querySelector('input');
+  if (f) setTimeout(() => { f.focus(); f.select(); }, 40);
+}
+function siBusy(form, on, label) {
+  form.querySelectorAll('button,input').forEach(el => { el.disabled = on; });
+  const b = form.querySelector('.primary');
+  if (label) { b.dataset.label = b.dataset.label || b.textContent; b.textContent = label; }
+  else if (b.dataset.label) b.textContent = b.dataset.label;
+  if (!on && form.id === 'si-code') siCooldownTick();
+}
+function openSignin(step, reason, feature) {
+  if (step === 'si-me') {
+    if (!authSession) step = 'si-email';
+    else { $('si-me-email').textContent = authSession.email; $('si-me-name').value = authSession.name; }
+  }
+  const why = $('si-why');
+  why.hidden = !reason;
+  why.textContent = reason === 'limit'
+    ? 'You have used all ' + GUEST_EXPORTS + ' guest exports. Sign in free for unlimited exports.'
+    : reason === 'feature' ? '✨ ' + feature + ' is for members. Sign in free to unlock it.' : '';
+  $('si-guest').textContent = guestMode() ? 'Not now' : 'Continue as a guest';
+  $('signin').classList.add('open');
+  siStep(step || 'si-email');
+  siBgStart();
+}
+function closeSignin() { $('signin').classList.remove('open'); siBgStop(); }
+function siCooldownTick() {
+  const b = $('si-resend');
+  const left = Math.ceil((siResendAt - Date.now()) / 1000);
+  if (left > 0) { b.disabled = true; b.textContent = 'Resend in ' + left + 's'; }
+  else { b.disabled = false; b.textContent = 'Resend code'; clearInterval(siTimer); siTimer = null; }
+}
+function siCooldown() {
+  siResendAt = Date.now() + 30000;
+  clearInterval(siTimer);
+  siCooldownTick();
+  siTimer = setInterval(siCooldownTick, 1000);
+}
+async function siSend(email) {
+  const form = $('si-email');
+  siBusy(form, true, 'Sending…');
+  siErr('');
+  const r = await authCall({ action: 'send', email });
+  siBusy(form, false);
+  if (!r.ok) { siErr(authMsg(r)); return false; }
+  siEmail = email.trim().toLowerCase();
+  $('si-to').textContent = siEmail;
+  $('si-code-in').value = '';
+  return true;
+}
+$('si-email').onsubmit = async e => {
+  e.preventDefault();
+  const email = $('si-email-in').value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(email)) { siErr(AUTH_MSG['bad-email']); return; }
+  if (await siSend(email)) { siStep('si-code'); siCooldown(); }
+};
+$('si-code').onsubmit = async e => {
+  e.preventDefault();
+  const code = $('si-code-in').value.replace(/\D/g, '');
+  if (code.length !== 6) { siErr('Type the 6-digit code from the email.'); return; }
+  const form = $('si-code');
+  siBusy(form, true, 'Checking…');
+  const r = await authCall({ action: 'verify', email: siEmail, code });
+  siBusy(form, false);
+  if (!r.ok) {
+    siErr(authMsg(r));
+    if (r.error === 'too-many' || r.error === 'expired') $('si-code-in').value = '';
+    return;
+  }
+  authPending = { email: r.email, token: r.token, exp: r.exp, name: r.name || '' };
+  if (authPending.name) { authSave(authPending); authPending = null; setGuest(false); finishSignin(false); return; }
+  $('si-name-in').value = '';
+  siStep('si-name');
+};
+$('si-code-in').addEventListener('input', () => {
+  const v = $('si-code-in');
+  const d = v.value.replace(/\D/g, '').slice(0, 6);
+  if (v.value !== d) v.value = d;
+  if (d.length === 6 && !$('si-verify').disabled) $('si-code').requestSubmit();
+});
+$('si-resend').onclick = async () => {
+  if (Date.now() < siResendAt) return;
+  const ok = await siSend(siEmail);
+  if (ok) { siCooldown(); siErr(''); toast('New code sent to ' + siEmail + '.', 'good'); }
+};
+$('si-back').onclick = () => { $('si-email-in').value = siEmail; siStep('si-email'); };
+async function siSaveName(form, input, token) {
+  const name = input.value.replace(/\s+/g, ' ').trim();
+  if (!name || name.length > 30) { siErr(AUTH_MSG['bad-name']); return null; }
+  siBusy(form, true, 'Saving…');
+  const r = await authCall({ action: 'profile', token, name });
+  siBusy(form, false);
+  if (!r.ok) {
+    siErr(authMsg(r));
+    if (r.error === 'signed-out') { authSave(null); setTimeout(() => siStep('si-email'), 1200); }
+    return null;
+  }
+  return r.name;
+}
+$('si-name').onsubmit = async e => {
+  e.preventDefault();
+  if (!authPending) { siStep('si-email'); return; }
+  const name = await siSaveName($('si-name'), $('si-name-in'), authPending.token);
+  if (!name) return;
+  authSave(Object.assign(authPending, { name }));
+  authPending = null;
+  setGuest(false);
+  finishSignin(true);
+};
+$('si-me').onsubmit = async e => {
+  e.preventDefault();
+  if (!authSession) { siStep('si-email'); return; }
+  const name = await siSaveName($('si-me'), $('si-me-name'), authSession.token);
+  if (!name) return;
+  authSave(Object.assign({}, authSession, { name }));
+  closeSignin();
+  toast('Name saved — hi ' + name + '!', 'good');
+};
+$('si-out').onclick = () => {
+  authSave(null);
+  setGuest(false);
+  siEmail = '';
+  $('si-email-in').value = '';
+  siStep('si-email');
+  toast('Signed out. Your projects are still saved on this device.');
+};
+$('si-me-close').onclick = closeSignin;
+$('si-guest').onclick = () => {
+  const already = guestMode();
+  setGuest(true);
+  closeSignin();
+  if (!authBooted) { authBooted = true; offerRestore(); }
+  if (!already) toast('You are a guest: every drawing tool, unlimited imports, ' + guestExportsLeft() + ' exports. Sign in any time for more.', 'good');
+};
+$('btn-me').onclick = () => openSignin(authSession ? 'si-me' : 'si-email');
+function finishSignin(isNew) {
+  closeSignin();
+  toast(isNew ? 'Welcome, ' + authSession.name + '! Let\u2019s make some GIFs.' : 'Welcome back, ' + authSession.name + '!', 'good');
+  if (!authBooted) { authBooted = true; offerRestore(); }
+  else if ($('welcome').classList.contains('open')) openWelcome();
+}
+async function authRefresh() {
+  const r = await authCall({ action: 'me', token: authSession.token });
+  if (r.ok) {
+    if (r.name && r.name !== authSession.name) authSave(Object.assign({}, authSession, { name: r.name }));
+  } else if (r.error === 'signed-out') {
+    authSave(null);
+    openSignin('si-email');
+    siErr(AUTH_MSG['signed-out']);
+  }
+}
+let siBgRaf = 0;
+function siBgStop() {
+  if (siBgRaf) cancelAnimationFrame(siBgRaf);
+  siBgRaf = 0;
+}
+function siBgStart() {
+  const cv = $('si-bg');
+  if (!cv || siBgRaf) return;
+  const c = cv.getContext('2d');
+  const css = getComputedStyle(document.documentElement);
+  const v = (n, d) => (css.getPropertyValue(n) || '').trim() || d;
+  const pal = [v('--accent', '#4c8dff'), v('--accent2', '#8b5cf6'), v('--good', '#10b981'), '#f59e0b', '#f43f5e', '#22d3ee'];
+  const panel = v('--panel2', '#20242e'), line = v('--line', '#2c313c'), bg = v('--bg', '#0f1115'), muted = v('--muted', '#96a0b5');
+  const rnd = smartRand(20260918);
+  const cards = [];
+  const spots = [[0.1, 0.3], [0.86, 0.26], [0.14, 0.72], [0.84, 0.7], [0.5, 0.2], [0.32, 0.5], [0.68, 0.52]];
+  spots.forEach(([x, y], i) => cards.push({ kind: i % 6, x, y, ph: rnd() * 6.28, col: pal[i % pal.length], s: 0.9 + rnd() * 0.35 }));
+  const tools = [['brush', '🖌️'], ['rect', '▭'], ['ellipse', '◯'], ['fill', '🪣'], ['spray', '💨'], ['brush', '✏️']];
+  let pen = null, penN = 0;
+  const makePen = (w, h) => {
+    const [tool, icon] = tools[penN++ % tools.length];
+    const cx = w * (0.18 + rnd() * 0.64), cy = h * (0.18 + rnd() * 0.64);
+    const pts = [];
+    for (let k = 0; k < 6; k++) pts.push({ x: cx + (rnd() - 0.5) * Math.min(w, 700) * 0.5, y: cy + (rnd() - 0.5) * Math.min(h, 600) * 0.4 });
+    return { tool, icon, pts, t: 0, col: pal[Math.floor(rnd() * pal.length)], seed: Math.floor(rnd() * 1e6) };
+  };
+  const along = (pts, u) => {
+    const n = pts.length - 1, f = Math.min(n - 1e-6, Math.max(0, u * n)), i = Math.floor(f), t = f - i;
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(n, i + 2)];
+    const t2 = t * t, t3 = t2 * t;
+    const k = (a, b, cc, d) => 0.5 * (2 * b + (-a + cc) * t + (2 * a - 5 * b + 4 * cc - d) * t2 + (-a + 3 * b - 3 * cc + d) * t3);
+    return { x: k(p0.x, p1.x, p2.x, p3.x), y: k(p0.y, p1.y, p2.y, p3.y) };
+  };
+  const rr = (x, y, w, h, r) => { c.beginPath(); c.roundRect(x, y, w, h, r); };
+  const drawCard = (cd, t, w, h) => {
+    const cw = 118 * cd.s, ch = 92 * cd.s;
+    const x = cd.x * w - cw / 2 + Math.sin(t * 0.25 + cd.ph) * 14, y = cd.y * h - ch / 2 + Math.cos(t * 0.21 + cd.ph) * 10;
+    c.save();
+    c.translate(x, y);
+    rr(0, 0, cw, ch, 10); c.fillStyle = panel; c.fill(); c.strokeStyle = line; c.lineWidth = 1; c.stroke();
+    c.fillStyle = muted; c.font = '600 9px system-ui,sans-serif'; c.fillText('GIF', 8, 13);
+    c.beginPath(); c.arc(cw - 10, 10, 3, 0, 6.29); c.fillStyle = (t * 2 | 0) % 2 ? '#ef4444' : 'transparent'; c.fill();
+    c.translate(cw / 2, ch / 2 + 6);
+    c.fillStyle = cd.col; c.strokeStyle = cd.col;
+    const T = t + cd.ph;
+    if (cd.kind === 0) {
+      const b = Math.abs(Math.sin(T * 3)) * 26 * cd.s;
+      c.globalAlpha = 0.3; c.beginPath(); c.ellipse(0, 22 * cd.s, 14 - b * 0.2, 3, 0, 0, 6.29); c.fill(); c.globalAlpha = 1;
+      c.beginPath(); c.arc(0, 12 * cd.s - b, 10 * cd.s, 0, 6.29); c.fill();
+    } else if (cd.kind === 1) {
+      c.rotate(T * 1.6);
+      c.beginPath();
+      for (let k = 0; k < 10; k++) { const r = (k % 2 ? 9 : 22) * cd.s, a = k * Math.PI / 5; k ? c.lineTo(Math.cos(a) * r, Math.sin(a) * r) : c.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+      c.closePath(); c.fill();
+    } else if (cd.kind === 2) {
+      const k = (1 + Math.max(0, Math.sin(T * 4)) * 0.25) * cd.s;
+      c.scale(k, k);
+      c.beginPath(); c.moveTo(0, 14); c.bezierCurveTo(-26, -4, -12, -24, 0, -10); c.bezierCurveTo(12, -24, 26, -4, 0, 14); c.fill();
+    } else if (cd.kind === 3) {
+      c.lineWidth = 3; c.lineCap = 'round'; c.beginPath();
+      for (let k = -42; k <= 42; k += 3) { const yy = Math.sin(k * 0.12 + T * 4) * 12; k === -42 ? c.moveTo(k * cd.s, yy) : c.lineTo(k * cd.s, yy); }
+      c.stroke();
+    } else if (cd.kind === 4) {
+      for (let k = 0; k < 6; k++) { const hh = (8 + Math.abs(Math.sin(T * 3 + k * 0.7)) * 24) * cd.s; c.fillRect((k * 12 - 33) * cd.s, 14 - hh, 8 * cd.s, hh); }
+    } else {
+      for (let k = 0; k < 4; k++) {
+        c.save(); c.rotate(T * 0.8 + k * Math.PI / 2); c.globalAlpha = 0.55 + 0.45 * Math.sin(T * 2 + k);
+        c.fillStyle = pal[(k + cd.kind) % pal.length]; rr(8 * cd.s, -6 * cd.s, 16 * cd.s, 12 * cd.s, 3); c.fill(); c.restore();
+      }
+    }
+    c.restore();
+  };
+  const drawStrip = (y, t, w, dir, hue) => {
+    const fw = 84, gap = 12, step = fw + gap, fh = 64;
+    const off = ((t * 38 * dir) % step + step) % step;
+    c.save();
+    c.fillStyle = panel; c.globalAlpha = 0.9; c.fillRect(0, y - 14, w, fh + 28);
+    c.globalAlpha = 1; c.fillStyle = bg;
+    for (let x = -step + off - 20; x < w + step; x += 24) { rr(x, y - 9, 12, 6, 2); c.fill(); rr(x, y + fh + 3, 12, 6, 2); c.fill(); }
+    let idx = 0;
+    for (let x = -step + off; x < w + step; x += step, idx++) {
+      rr(x, y, fw, fh, 6); c.fillStyle = line; c.fill();
+      const ph = ((idx + Math.floor(t * 38 * dir / step)) % 8 + 8) % 8;
+      const bx = x + 14 + ph * 7.5, by = y + fh - 14 - Math.abs(Math.sin(ph / 8 * Math.PI)) * 30;
+      c.beginPath(); c.arc(bx, by, 8, 0, 6.29); c.fillStyle = pal[hue]; c.fill();
+    }
+    c.restore();
+  };
+  const drawPen = (p, w, h, dt) => {
+    p.t += dt;
+    const draw = 2.4, hold = 3.4, fade = 4.4;
+    if (p.t > fade) return false;
+    const u = Math.min(1, p.t / draw), e = 1 - Math.pow(1 - u, 3);
+    const a = p.t < hold ? 1 : 1 - (p.t - hold) / (fade - hold);
+    c.save();
+    c.globalAlpha = 0.85 * a;
+    c.strokeStyle = p.col; c.fillStyle = p.col; c.lineWidth = 7; c.lineCap = 'round'; c.lineJoin = 'round';
+    let tip = along(p.pts, e);
+    const p0 = p.pts[0];
+    if (p.tool === 'brush') {
+      c.beginPath();
+      for (let k = 0; k <= 90; k++) { const q = along(p.pts, e * k / 90); k ? c.lineTo(q.x, q.y) : c.moveTo(q.x, q.y); }
+      c.stroke();
+    } else if (p.tool === 'rect' || p.tool === 'ellipse') {
+      const q = p.pts[3], x1 = p0.x + (q.x - p0.x) * e, y1 = p0.y + (q.y - p0.y) * e;
+      c.lineWidth = 5; c.beginPath();
+      if (p.tool === 'rect') c.rect(Math.min(p0.x, x1), Math.min(p0.y, y1), Math.abs(x1 - p0.x), Math.abs(y1 - p0.y));
+      else c.ellipse((p0.x + x1) / 2, (p0.y + y1) / 2, Math.abs(x1 - p0.x) / 2 + 0.1, Math.abs(y1 - p0.y) / 2 + 0.1, 0, 0, 6.29);
+      c.stroke();
+      tip = { x: x1, y: y1 };
+    } else if (p.tool === 'fill') {
+      const r = 90 * e;
+      c.globalAlpha = 0.45 * a; c.beginPath(); c.arc(p0.x, p0.y, r, 0, 6.29); c.fill();
+      c.globalAlpha = 0.85 * a; c.lineWidth = 3; c.stroke();
+      tip = p0;
+    } else {
+      const R = smartRand(p.seed);
+      const n = Math.floor(e * 260);
+      for (let k = 0; k < n; k++) {
+        const q = along(p.pts, k / 260), ang = R() * 6.29, d = R() * 22;
+        c.fillRect(q.x + Math.cos(ang) * d, q.y + Math.sin(ang) * d, 2.4, 2.4);
+      }
+    }
+    c.globalAlpha = a;
+    c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(tip.x, tip.y); c.lineTo(tip.x + 3, tip.y + 15); c.lineTo(tip.x + 7, tip.y + 10); c.lineTo(tip.x + 13, tip.y + 12); c.closePath(); c.fill(); c.stroke();
+    c.font = '18px system-ui,"Segoe UI Emoji",sans-serif';
+    c.fillText(p.icon, tip.x + 14, tip.y + 28);
+    c.restore();
+    return true;
+  };
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last = performance.now(), t = 0;
+  const frame = now => {
+    const dpr = Math.min(1.5, window.devicePixelRatio || 1);
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    t += dt;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    c.globalAlpha = 0.55;
+    drawStrip(24, t, w, 1, 0);
+    drawStrip(h - 104, t, w, -1, 1);
+    c.globalAlpha = 0.6;
+    cards.forEach(cd => drawCard(cd, t, w, h));
+    c.globalAlpha = 1;
+    if (!pen) pen = makePen(w, h);
+    if (!drawPen(pen, w, h, dt)) pen = null;
+    const g = c.createRadialGradient(w / 2, h / 2, 60, w / 2, h / 2, Math.max(w, h) * 0.7);
+    g.addColorStop(0, bg); g.addColorStop(0.35, 'transparent'); g.addColorStop(1, 'transparent');
+    c.globalAlpha = 0.75; c.fillStyle = g; c.fillRect(0, 0, w, h); c.globalAlpha = 1;
+    siBgRaf = still ? 0 : requestAnimationFrame(frame);
+  };
+  siBgRaf = requestAnimationFrame(frame);
+}
+function authGate() {
+  authSession = authLoad();
+  renderMe();
+  if (authSession) {
+    authBooted = true;
+    offerRestore();
+    authRefresh();
+    return;
+  }
+  try { localStorage.removeItem('fs-auth'); } catch (_) {}
+  if (guestMode()) { authBooted = true; offerRestore(); return; }
+  openSignin('si-email');
+}
 
 /* ------------------------------------------------------------------ boot */
 frames.push(newFrame());
@@ -6466,7 +6979,7 @@ setTool('brush');
 refreshAll();
 applyZoom();
 zoomFit();
-offerRestore();
+authGate();
 </script>
 </body>
 </html>
