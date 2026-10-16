@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://gifstudio.onrender.com/sitemap.xml
