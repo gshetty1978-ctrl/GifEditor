@@ -372,6 +372,16 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
 #btn-me{font-weight:600}
 #w-hi{margin:6px 0 -12px;font-weight:700;color:var(--text)}
 
+html.pixel canvas#view{image-rendering:pixelated}
+#pxgrid{position:absolute;inset:0;pointer-events:none;display:none}
+html.pixel .fr canvas{image-rendering:pixelated}
+#pixel-sizes{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+#pixel-sizes button{padding:5px 9px;font-size:12px}
+#pixel-sizes button.on{border-color:var(--accent);color:var(--text)}
+#pixel-chars{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:4px}
+#pixel-chars button{justify-content:flex-start;gap:7px;font-size:12.5px;padding:5px 7px}
+#pixel-chars canvas{width:22px;height:22px;image-rendering:pixelated;border-radius:4px;background:var(--panel2);flex:0 0 auto}
+
 /* ---- modal ---- */
 .modal{position:fixed;inset:0;background:rgba(4,6,10,.62);display:none;z-index:80;
   align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(2px)}
@@ -681,7 +691,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
     </div>
 
     <div class="viewport" id="viewport">
-      <div class="canvas-shell" id="shell"><canvas id="view" width="500" height="500"></canvas></div>
+      <div class="canvas-shell" id="shell"><canvas id="view" width="500" height="500"></canvas><div id="pxgrid"></div></div>
     </div>
 
     <div class="zoombar">
@@ -731,6 +741,15 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <span id="st-export">No export yet</span>
         <span class="hint" id="hint">Brush selected — draw on the canvas.</span>
       </div>
+    </div>
+    <div class="sec">
+      <h3>🟦 Pixel art</h3>
+      <label class="row">Pixel mode <input type="checkbox" id="pixel-on" title="Crisp pixels: no blurring when you zoom or export, plus a hard-edged pencil"></label>
+      <label class="row">Pixel grid <input type="checkbox" id="pixel-grid" checked title="Show the single-pixel grid once you zoom past 6x"></label>
+      <p class="note">Canvas size</p>
+      <div id="pixel-sizes"></div>
+      <p class="note">Drop in a character, already animated</p>
+      <div id="pixel-chars"></div>
     </div>
     <div class="sec">
       <h3>🖼️ Canvas</h3>
@@ -843,6 +862,7 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
         <option>256</option><option>128</option><option>64</option><option>32</option><option>16</option><option>8</option>
       </select></label>
       <label class="row">Scale <select id="export-scale" style="width:96px">
+        <option value="16">1600%</option><option value="8">800%</option><option value="4">400%</option><option value="2">200%</option>
         <option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.25">25%</option>
       </select></label>
       <label class="row">Dither <select id="dither" style="width:118px" title="Trades a little noise for far smoother gradients at low colour counts">
@@ -1284,6 +1304,19 @@ function renderTinted(c, f, tint) {
   t.globalCompositeOperation = 'source-over';
   c.drawImage(tintBuf, 0, 0);
 }
+function updatePixelGrid() {
+  const g = $('pxgrid');
+  if (!g) return;
+  const on = pixelMode && $('pixel-grid').checked && zoom >= 3;
+  g.style.display = on ? 'block' : 'none';
+  if (!on) return;
+  const z = zoom, minor = 'rgba(150,170,210,.28)', major = 'rgba(150,170,210,.6)';
+  g.style.backgroundImage =
+    'repeating-linear-gradient(to right,' + major + ' 0 1px,transparent 1px ' + (z * 8) + 'px),' +
+    'repeating-linear-gradient(to bottom,' + major + ' 0 1px,transparent 1px ' + (z * 8) + 'px),' +
+    'repeating-linear-gradient(to right,' + minor + ' 0 1px,transparent 1px ' + z + 'px),' +
+    'repeating-linear-gradient(to bottom,' + minor + ' 0 1px,transparent 1px ' + z + 'px)';
+}
 function drawGrid() {
   const g = Math.max(2, +$('grid-size').value || 32), u = perPx();
   vctx.save();
@@ -1334,6 +1367,7 @@ function repaint(ghost) {
   if (pixFloat) vctx.drawImage(pixFloat.cv, pixFloat.x + pixFloat.dx, pixFloat.y + pixFloat.dy);
   vctx.globalAlpha = 1;
   if ($('grid-on').checked && !playing) drawGrid();
+  updatePixelGrid();
   if (!playing) drawPixSel();
   if (ghost) ghost(vctx);
   if (cropRect) drawCropOverlay();
@@ -1409,17 +1443,19 @@ function applyZoom() {
   shell.style.width = Math.round(W * zoom) + 'px';
   shell.style.height = Math.round(H * zoom) + 'px';
   $('zoom-val').textContent = Math.round(zoom * 100) + '%';
+  updatePixelGrid();
   updateStatus();
   $('canvas-dims').textContent = W + ' \u00d7 ' + H + ' px';
   repaint();
 }
 function setZoom(z) {
-  zoom = Math.min(8, Math.max(0.1, z));
+  zoom = Math.min(pixelMode ? 64 : 8, Math.max(0.1, z));
   applyZoom();
 }
 function zoomFit() {
   const vp = $('viewport');
-  const z = Math.min((vp.clientWidth - 28) / W, (vp.clientHeight - 28) / H);
+  let z = Math.min((vp.clientWidth - 28) / W, (vp.clientHeight - 28) / H);
+  if (pixelMode && z > 1) z = Math.floor(z);
   setZoom(z > 0 ? z : 1);
 }
 
@@ -1608,6 +1644,7 @@ function drawThumb(i) {
   c.fillRect(0, 0, z, z);
   const s = Math.min(z / W, z / H);
   c.save();
+  c.imageSmoothingEnabled = !pixelMode;
   c.translate((z - W * s) / 2, (z - H * s) / 2);
   c.scale(s, s);
   renderFrame(c, f);
@@ -2472,7 +2509,27 @@ function readPressure(e) {
 function pressureScale() {
   return (penActive && $('pressure-on').checked) ? 0.25 + 0.75 * penPressure : 1;
 }
+function pixelSeg(c, a, b) {
+  const size = Math.max(1, Math.round(+$('size').value));
+  const off = Math.floor((size - 1) / 2);
+  let x0 = Math.floor(a.x), y0 = Math.floor(a.y);
+  const x1 = Math.floor(b.x), y1 = Math.floor(b.y);
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  const pts = [];
+  for (;;) {
+    pts.push([x0, y0]);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x0 += sx; }
+    if (e2 < dx) { err += dx; y0 += sy; }
+    if (pts.length > 4096) break;
+  }
+  withSym(c, cc => { pts.forEach(q => cc.fillRect(q[0] - off, q[1] - off, size, size)); });
+}
 function strokeSeg(c, a, b) {
+  if (pixelMode && (tool === 'brush' || tool === 'eraser')) { pixelSeg(c, a, b); return; }
   const k = pressureScale();
   const baseW = +$('size').value, baseA = +$('alpha').value / 100;
   if (k !== 1) {
@@ -2514,7 +2571,7 @@ function smudgeAt(c, a, b, r, strength) {
   c.restore();
 }
 function snapPt(p) {
-  if (!$('grid-snap').checked) return p;
+  if (!$('grid-snap').checked) return pixelMode ? { x: Math.round(p.x), y: Math.round(p.y) } : p;
   const g = Math.max(2, +$('grid-size').value || 32);
   return { x: Math.round(p.x / g) * g, y: Math.round(p.y / g) * g };
 }
@@ -2535,7 +2592,7 @@ function floodFill(p) {
   const [r, g, b] = hexToRGB($('color').value);
   const a = Math.round(255 * (+$('alpha').value / 100));
   if (target[0] === r && target[1] === g && target[2] === b && target[3] === a) return;
-  const t0 = Math.max(0, +$('tol').value || 0);
+  const t0 = pixelMode ? 0 : Math.max(0, +$('tol').value || 0);
   const tol = t0 * t0 * 4;
   const match = i => {
     const dr = d[i] - target[0], dg = d[i + 1] - target[1], db = d[i + 2] - target[2], da = d[i + 3] - target[3];
@@ -4057,6 +4114,7 @@ function pingPong() {
 /* ========================================================= other exports */
 function composite(i, ow, oh) {
   const t = makeCanvas(ow, oh, true), c = t.getContext('2d');
+  c.imageSmoothingEnabled = !pixelMode;
   if (!$('bg-transparent').checked) { c.fillStyle = $('bg-color').value; c.fillRect(0, 0, ow, oh); }
   c.save();
   c.scale(ow / W, oh / H);
@@ -6356,6 +6414,7 @@ const COMMANDS = [
   { g: 'Edit', n: 'Rotate project 90° right', r: () => rotate90(1) },
   { g: 'Edit', n: 'Rotate project 90° left', r: () => rotate90(-1) },
   { g: 'View', n: 'Toggle onion skin', r: () => $('btn-onion').click() },
+  { g: 'View', n: 'Pixel art mode on or off', r: () => setPixelMode(!pixelMode, true) },
   { g: 'View', n: 'Toggle grid', r: () => { $('grid-on').checked = !$('grid-on').checked; repaint(); } },
   { g: 'View', n: 'Toggle snap to grid', r: () => { $('grid-snap').checked = !$('grid-snap').checked; toast('Snap to grid ' + ($('grid-snap').checked ? 'on.' : 'off.')); } },
   { g: 'View', n: 'Fit canvas to the window', k: '0', r: () => { zoomIsFit = true; zoomFit(); } },
@@ -6974,12 +7033,215 @@ function authGate() {
   openSignin('si-email');
 }
 
+let pixelMode = false;
+function setPixelMode(on, remember) {
+  pixelMode = !!on;
+  document.documentElement.classList.toggle('pixel', pixelMode);
+  $('pixel-on').checked = pixelMode;
+  if (remember) { try { localStorage.setItem('fs-pixel', pixelMode ? '1' : '0'); } catch (_) {} }
+  if (pixelMode) {
+    const sz = $('size');
+    if (+sz.value > 4) { sz.value = 1; sz.dispatchEvent(new Event('input')); }
+  }
+  renderPixelSizes();
+  if (zoomIsFit) zoomFit(); else applyZoom();
+  frames.forEach((_, i) => drawThumb(i));
+  repaint();
+}
+const PX = 16;
+function pxBuf() { return new Array(PX * PX).fill(null); }
+function pxSet(b, x, y, col) {
+  x = Math.round(x); y = Math.round(y);
+  if (x >= 0 && y >= 0 && x < PX && y < PX) b[y * PX + x] = col;
+}
+function pxRect(b, x, y, w, h, col) {
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) pxSet(b, x + i, y + j, col);
+}
+function pxBlob(b, cx, cy, rx, ry, col) {
+  for (let y = Math.floor(cy - ry); y <= cy + ry; y++) {
+    for (let x = Math.floor(cx - rx); x <= cx + rx; x++) {
+      const u = (x + 0.5 - cx) / rx, v = (y + 0.5 - cy) / ry;
+      if (u * u + v * v <= 1) pxSet(b, x, y, col);
+    }
+  }
+}
+const PIXEL_CHARS = [
+  { id: 'slime', name: 'Slime', frames: 4, draw: (b, f) => {
+      const k = [0, 1, 0, -1][f], lift = f === 3 ? 2 : 0;
+      const rx = 5 + k, ry = 4 - k, cy = 11 - lift;
+      pxBlob(b, 8, cy, rx, ry, '#36b863');
+      pxBlob(b, 8, cy + 0.8, rx - 1, ry - 1.2, '#57dd87');
+      pxRect(b, 8 - rx, cy + ry - 1, rx * 2, 1, '#248a47');
+      pxSet(b, 6, cy - 1, '#0e2c1a'); pxSet(b, 10, cy - 1, '#0e2c1a');
+      pxSet(b, 7, cy + 1, '#0e2c1a'); pxSet(b, 8, cy + 2, '#0e2c1a'); pxSet(b, 9, cy + 1, '#0e2c1a');
+    } },
+  { id: 'hero', name: 'Hero', frames: 4, draw: (b, f) => {
+      const bob = [0, 1, 0, 1][f], back = [0, 1, 0, -1][f];
+      const skin = '#f0c08c', hair = '#6b3f1d', shirt = '#3b7dd8', pants = '#2b3a55', boot = '#6b4a2a';
+      const y = 2 + bob;
+      pxRect(b, 6, y, 4, 1, hair);
+      pxRect(b, 6, y + 1, 4, 3, skin);
+      pxSet(b, 6, y + 1, hair); pxSet(b, 9, y + 1, hair);
+      pxSet(b, 7, y + 2, '#1b2030'); pxSet(b, 9, y + 2, '#1b2030');
+      pxRect(b, 5, y + 5, 6, 4, shirt);
+      pxRect(b, 4, y + 5 + Math.max(0, back), 1, 3, skin);
+      pxRect(b, 11, y + 5 + Math.max(0, -back), 1, 3, skin);
+      pxRect(b, 6, y + 9, 2, 3 - Math.abs(back), pants);
+      pxRect(b, 8, y + 9, 2, 3 - Math.abs(back ? 0 : 1), pants);
+      pxRect(b, 5 + Math.max(0, back), y + 12 - Math.abs(back), 3, 1, boot);
+      pxRect(b, 8 - Math.max(0, -back), y + 12 - (back ? 0 : 1), 3, 1, boot);
+    } },
+  { id: 'bird', name: 'Bird', frames: 4, draw: (b, f) => {
+      const base = [
+        '................',
+        '................',
+        '................',
+        '.........BBB....',
+        '........BBBBB...',
+        '........BBEBB...',
+        '.......BBBBBBKK.',
+        '....BBBBBBBBBK..',
+        '..DBBBBBBBBBB...',
+        '..DDBBBBBBBB....',
+        '...DDDBBBBB.....',
+        '......BB.BB.....',
+        '......KK.KK.....',
+        '................',
+        '................',
+        '................'
+      ];
+      const up = [
+        '....DD..........',
+        '.....DDD........',
+        '......DDD.......',
+        '.......DD.......'
+      ];
+      const mid = ['.....DDDD.......', '......DDD.......'];
+      const down = ['......DDD.......', '.....DDDD.......', '....DDD.........'];
+      const map = { B: '#ffc24d', D: '#e89a22', E: '#1b2030', K: '#ff7a3c' };
+      const bob = [0, -1, 0, 1][f];
+      base.forEach((row, y) => {
+        for (let x = 0; x < PX; x++) if (map[row[x]]) pxSet(b, x, y + bob, map[row[x]]);
+      });
+      const wing = [mid, up, mid, down][f];
+      const top = [7, 3, 7, 9][f];
+      wing.forEach((row, j) => {
+        for (let x = 0; x < PX; x++) if (map[row[x]]) pxSet(b, x, top + j + bob, map[row[x]]);
+      });
+    } },
+  { id: 'star', name: 'Star', frames: 4, draw: (b, f) => {
+      const mask = [
+        '.......XX.......',
+        '.......XX.......',
+        '......XXXX......',
+        '......XXXX......',
+        '.XXXXXXXXXXXXXX.',
+        '..XXXXXXXXXXXX..',
+        '...XXXXXXXXXX...',
+        '...XXXXXXXXXX...',
+        '..XXXXXXXXXXXX..',
+        '..XXXXXXXXXXXX..',
+        '..XXXXX..XXXXX..',
+        '..XXX......XXX..',
+        '.XXX........XXX.',
+        '.XX..........XX.',
+        '................',
+        '................'
+      ];
+      const squash = [1, 0.55, 0.16, 0.55][f];
+      const gold = '#ffd34d', deep = '#eca100';
+      for (let y = 0; y < PX; y++) {
+        for (let x = 0; x < PX; x++) {
+          const src = Math.round((x + 0.5 - 8) / squash + 8 - 0.5);
+          if (src < 0 || src >= PX) continue;
+          if (mask[y][src] !== 'X') continue;
+          pxSet(b, x, y, y > 8 ? deep : gold);
+        }
+      }
+    } }
+];
+function pxRender(ch, i) {
+  const b = pxBuf();
+  ch.draw(b, i);
+  const cv = makeCanvas(PX, PX, true), c = cv.getContext('2d');
+  for (let y = 0; y < PX; y++) for (let x = 0; x < PX; x++) {
+    const col = b[y * PX + x];
+    if (!col) continue;
+    c.fillStyle = col;
+    c.fillRect(x, y, 1, 1);
+  }
+  return cv;
+}
+function addPixelCharacter(id) {
+  const ch = PIXEL_CHARS.find(c => c.id === id);
+  if (!ch) return;
+  stopPlay();
+  pushStruct();
+  if (!pixelMode) setPixelMode(true, true);
+  const scale = Math.max(1, Math.floor(Math.min(W, H) / PX));
+  const ox = Math.floor((W - PX * scale) / 2), oy = Math.floor((H - PX * scale) / 2);
+  for (let i = 0; i < ch.frames; i++) {
+    if (i > 0) { frames.splice(cur + 1, 0, newFrame(140)); cur++; }
+    F().delay = 140;
+    const c = fctx();
+    c.save();
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
+    c.imageSmoothingEnabled = false;
+    c.drawImage(pxRender(ch, i), ox, oy, PX * scale, PX * scale);
+    c.restore();
+  }
+  sel = -1; dirty = true;
+  renderTimeline(); refreshAll();
+  toast(ch.name + ' added over ' + ch.frames + ' frames. Press Play to watch it move.', 'good');
+}
+const PIXEL_SIZES = [16, 32, 48, 64, 128];
+function renderPixelSizes() {
+  const host = $('pixel-sizes');
+  if (!host) return;
+  host.innerHTML = '';
+  PIXEL_SIZES.forEach(n => {
+    const b = document.createElement('button');
+    b.textContent = n;
+    b.title = n + ' by ' + n + ' pixels';
+    if (W === n && H === n) b.classList.add('on');
+    b.onclick = () => {
+      if (!pixelMode) setPixelMode(true, true);
+      resize(n, n, false);
+      renderPixelSizes();
+      zoomIsFit = true; zoomFit();
+    };
+    host.appendChild(b);
+  });
+}
+function renderPixelChars() {
+  const host = $('pixel-chars');
+  if (!host) return;
+  host.innerHTML = '';
+  PIXEL_CHARS.forEach(ch => {
+    const b = document.createElement('button');
+    b.title = ch.name + ': adds ' + ch.frames + ' animated frames';
+    const prev = pxRender(ch, 0);
+    b.appendChild(prev);
+    const label = document.createElement('span');
+    label.textContent = ch.name;
+    b.appendChild(label);
+    b.onclick = () => addPixelCharacter(ch.id);
+    host.appendChild(b);
+  });
+}
+$('pixel-on').onchange = e => setPixelMode(e.target.checked, true);
+$('pixel-grid').onchange = updatePixelGrid;
+
 /* ------------------------------------------------------------------ boot */
 frames.push(newFrame());
 try { setTheme(localStorage.getItem('fs-theme') || 'dark'); } catch (_) { setTheme('dark'); }
 renderSwatches();
 renderRecents();
 renderBGPresets();
+renderPixelSizes();
+renderPixelChars();
+try { if (localStorage.getItem('fs-pixel') === '1') setPixelMode(true, false); } catch (_) {}
 initSections();
 buildFindIndex();
 try { setTimelineSize(+localStorage.getItem('fs-tlsize') || 84); } catch (_) { setTimelineSize(84); }
