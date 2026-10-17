@@ -941,6 +941,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
       </div>
       <div class="wcard" id="w-projects"><span class="big">🗂️</span><b>My projects</b><span id="w-projects-sub">Everything saved on this device</span></div>
       <div class="wcard" id="w-new"><span class="big">✨</span><b>New project</b><span>Start on a blank canvas</span></div>
+      <div class="wcard" id="w-pixel"><span class="big">🟦</span><b>Pixel art</b><span>A crisp 32 × 32 canvas, with characters ready to animate</span></div>
       <div class="wcard" id="w-import"><span class="big">📥</span><b>Import GIF or images</b><span>Open an existing animation, or a pile of stills</span></div>
       <div class="wcard" id="w-open"><span class="big">📂</span><b>Open project</b><span>A .json you saved from here before</span></div>
     </div>
@@ -6124,6 +6125,16 @@ function newProject(w, h) {
   if (zoomIsFit) zoomFit();
 }
 $('w-new').onclick = () => startFreshProject();
+$('w-pixel').onclick = () => {
+  setPixelMode(true, true);
+  startFreshProject(32, 32);
+  renderPixelSizes();
+  zoomIsFit = true;
+  setTimeout(zoomFit, 40);
+  const sec = $('pixel-on').closest('.sec');
+  if (sec) { setSectionOpen(sec, true, false); revealSection(sec); }
+  toast('Pixel art: a 32 x 32 canvas with crisp pixels. Pick a character from the Pixel art panel.', 'good');
+};
 $('w-import').onclick = () => { closeWelcome(); $('file-img').click(); };
 $('w-open').onclick = () => { closeWelcome(); $('file-proj').click(); };
 $('w-close').onclick = closeWelcome;
