@@ -382,6 +382,21 @@ html.pixel .fr canvas{image-rendering:pixelated}
 #pixel-chars button{justify-content:flex-start;gap:7px;font-size:12.5px;padding:5px 7px}
 #pixel-chars canvas{width:22px;height:22px;image-rendering:pixelated;border-radius:4px;background:var(--panel2);flex:0 0 auto}
 
+#busy{position:fixed;inset:0;z-index:98;display:none;align-items:center;justify-content:center;
+  background:rgba(6,8,12,.55);backdrop-filter:blur(2px)}
+#busy.on{display:flex}
+#busy .box{min-width:240px;max-width:min(360px,92vw);padding:20px 22px;border-radius:14px;text-align:center;
+  background:var(--panel);border:1px solid var(--line);box-shadow:0 20px 50px rgba(0,0,0,.5)}
+#busy .spin{width:38px;height:38px;margin:0 auto 12px;border-radius:50%;
+  border:3px solid var(--line);border-top-color:var(--accent);animation:busyspin .8s linear infinite}
+@keyframes busyspin{to{transform:rotate(360deg)}}
+#busy .what{font-size:13.5px;font-weight:600}
+#busy .sub{color:var(--muted);font-size:12px;margin-top:4px;font-variant-numeric:tabular-nums}
+#busy .track{height:6px;border-radius:99px;background:var(--panel2);margin-top:12px;overflow:hidden}
+#busy .track i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+#busy button{margin-top:13px;font-size:12.5px}
+@media (prefers-reduced-motion:reduce){#busy .spin{animation-duration:2.4s}}
+
 /* ---- modal ---- */
 .modal{position:fixed;inset:0;background:rgba(4,6,10,.62);display:none;z-index:80;
   align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(2px)}
@@ -949,6 +964,40 @@ html.pixel .fr canvas{image-rendering:pixelated}
     <div class="wfoot">
       <label><input type="checkbox" id="w-skip"> Skip this next time</label>
       <button id="w-close">Straight to the editor →</button>
+    </div>
+  </div>
+</div>
+
+<div id="busy" aria-live="polite">
+  <div class="box">
+    <div class="spin"></div>
+    <div class="what" id="busy-what">Working…</div>
+    <div class="sub" id="busy-sub"></div>
+    <div class="track"><i id="busy-bar"></i></div>
+    <button id="busy-stop" class="danger" hidden>Stop</button>
+  </div>
+</div>
+
+<div class="modal" id="vid-modal">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Video to frames">
+    <h2>🎬 Video → frames</h2>
+    <p class="sub" id="vid-about">—</p>
+    <div class="fx-row"><span>Frames per second</span>
+      <input type="range" id="vid-fps" min="4" max="30" step="1" value="24">
+      <span id="vid-fps-val">24</span></div>
+    <div class="fx-row"><span>Most frames</span>
+      <input type="range" id="vid-max" min="30" max="400" step="10" value="240">
+      <span id="vid-max-val">240</span></div>
+    <div class="fx-row"><span>Use</span>
+      <select id="vid-part">
+        <option value="all">The whole video</option>
+        <option value="first">Just the first 5 seconds</option>
+        <option value="first10">Just the first 10 seconds</option>
+      </select><span></span></div>
+    <p class="note" id="vid-estimate">—</p>
+    <div class="foot">
+      <button id="vid-go" class="green">Make frames</button>
+      <button id="vid-cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -2990,20 +3039,70 @@ const tick = () => new Promise(r => setTimeout(r, 0));
    Yielding once per frame is wasteful, and a backgrounded tab throttles
    chained timers to roughly one per second, which turned a 250ms export
    into a six second one. */
-let lastYield = 0;
+let lastYield = 0, jobStop = false;
+function stopJob() { jobStop = true; }
+function jobHalted(err) { return err && err.stopped; }
 async function maybeYield() {
+  if (jobStop) { jobStop = false; const e = new Error('stopped'); e.stopped = true; throw e; }
   const now = performance.now();
   if (now - lastYield < 50) return;
   lastYield = now;
   await tick();
 }
+let busyCancel = null;
+function busy(what, sub, frac, onStop) {
+  const el = $('busy');
+  if (what === false) { el.classList.remove('on'); busyCancel = null; $('busy-stop').hidden = true; return; }
+  $('busy-what').textContent = what;
+  el.dataset.started = el.dataset.started || Date.now();
+  $('busy-sub').textContent = sub || '';
+  $('busy-bar').style.width = Math.max(0, Math.min(1, frac || 0)) * 100 + '%';
+  if (onStop !== undefined) {
+    busyCancel = onStop;
+    $('busy-stop').hidden = !onStop;
+  }
+  el.classList.add('on');
+}
+function busyUpdate(sub, frac) {
+  if (!$('busy').classList.contains('on')) return;
+  $('busy-sub').textContent = sub || '';
+  $('busy-bar').style.width = Math.max(0, Math.min(1, frac || 0)) * 100 + '%';
+}
+let busyTimer = null, busyMsg = '', busyFrac = 0;
+function busySetCancel(fn) {
+  busyCancel = fn;
+  $('busy-stop').hidden = !fn;
+}
 function progress(v, msg) {
   const bar = $('bar');
-  if (v < 0) { bar.style.display = 'none'; return; }
+  if (v < 0) {
+    bar.style.display = 'none';
+    clearTimeout(busyTimer); busyTimer = null;
+    busy(false);
+    return;
+  }
   bar.style.display = 'block';
   bar.firstElementChild.style.width = (v * 100) + '%';
-  if (msg) $('hint').textContent = msg;
+  if (msg) { $('hint').textContent = msg; busyMsg = msg; }
+  busyFrac = v;
+  if ($('busy').classList.contains('on')) {
+    $('busy-what').textContent = busyMsg || 'Working...';
+    busyUpdate(Math.round(v * 100) + '%', v);
+  }
+  else if (!busyTimer) busyTimer = setTimeout(() => {
+    busyTimer = null;
+    if (!busyCancel) busyCancel = stopJob;
+    busy(busyMsg || 'Working…', Math.round(busyFrac * 100) + '%', busyFrac);
+    $('busy-stop').hidden = false;
+  }, 400);
 }
+$('busy-stop').onclick = () => {
+  if (busyCancel) busyCancel();
+  $('busy-what').textContent = 'Stopping…';
+  $('busy-sub').textContent = '';
+  $('busy-stop').hidden = true;
+  setTimeout(() => { progress(-1); busy(false); }, 1200);
+};
 function download(blob, name) {
   if (!isMember() && !/\.json$/i.test(name)) guestExportUsed();
   noteExport(name, blob.size);          // the status bar reports what last left the app
@@ -3791,10 +3890,13 @@ $('btn-export').onclick = async () => {
   try {
     await exportGIF();
   } catch (err) {
-    console.error(err);
     progress(-1);
-    toast('Export failed: ' + err.message, 'bad');
-    flash('Export failed — see the console for details.');
+    if (jobHalted(err)) { toast('Export stopped.'); }
+    else {
+      console.error(err);
+      toast('Export failed: ' + err.message, 'bad');
+      flash('Export failed — see the console for details.');
+    }
   } finally {
     b.disabled = false;
     b.textContent = label;
@@ -5947,6 +6049,35 @@ function renderBGPresets() {
 /* ========================================================= video → frames */
 /* Seek, draw, repeat. Seeking rather than playing means the sampling is
    exact and a slow machine cannot drop frames on us. */
+let vidPending = null;
+function vidSpan() {
+  if (!vidPending) return 0;
+  const part = $('vid-part').value;
+  const cap = part === 'first' ? 5 : part === 'first10' ? 10 : Infinity;
+  return Math.min(vidPending.dur, cap);
+}
+function vidPlan() {
+  const span = vidSpan();
+  const fps = +$('vid-fps').value, max = +$('vid-max').value;
+  let want = Math.max(2, Math.round(span * fps));
+  let real = fps;
+  if (want > max) { want = max; real = want / span; }
+  return { span, fps, want, real, step: span / want };
+}
+function vidSync() {
+  $('vid-fps-val').textContent = $('vid-fps').value;
+  $('vid-max-val').textContent = $('vid-max').value;
+  if (!vidPending) return;
+  const pl = vidPlan();
+  const note = pl.real < pl.fps - 0.05
+    ? pl.want + ' frames, which is ' + pl.real.toFixed(1) + ' per second. Raise "most frames" for smoother motion.'
+    : pl.want + ' frames at ' + pl.fps + ' per second.';
+  $('vid-estimate').textContent = note + ' Plays for ' + pl.span.toFixed(1) + 's.';
+}
+function vidClose() {
+  $('vid-modal').classList.remove('open');
+  if (vidPending) { URL.revokeObjectURL(vidPending.url); vidPending = null; }
+}
 async function importVideo(file) {
   const url = URL.createObjectURL(file);
   const v = document.createElement('video');
@@ -5959,37 +6090,104 @@ async function importVideo(file) {
     });
     const dur = v.duration;
     if (!isFinite(dur) || dur <= 0) throw new Error('the video has no readable duration');
-    const fps = 12;                       // a sane default for hand-drawn-looking output
-    const want = Math.min(120, Math.max(2, Math.round(dur * fps)));
-    const step = dur / want;
+    vidPending = { file, url, v, dur };
+    $('vid-about').textContent = file.name + ' — ' + dur.toFixed(1) + ' seconds, ' + v.videoWidth + ' × ' + v.videoHeight + '. Your canvas is ' + W + ' × ' + H + '.';
+    $('vid-part').value = dur > 10 ? 'first10' : 'all';
+    vidSync();
+    $('vid-modal').classList.add('open');
+  } catch (err) {
+    URL.revokeObjectURL(url);
+    progress(-1);
+    toast('Video import failed: ' + err.message, 'bad');
+  }
+}
+async function vidRun() {
+  if (!vidPending) return;
+  const { file, url, v, dur } = vidPending;
+  const pl = vidPlan();
+  vidPending = null;
+  $('vid-modal').classList.remove('open');
+  try {
+    const want = pl.want, step = pl.step;
+    const fps = pl.real;
     progress(.02, 'Sampling video…');
     stopPlay();
     pushStruct();
-    const seekTo = t => new Promise(res => { v.onseeked = res; v.currentTime = Math.min(t, dur - 0.001); });
+    let stopped = false;
+    busySetCancel(() => { stopped = true; });
+    const delay = Math.max(20, Math.round(step * 1000));
     const made = [];
-    for (let i = 0; i < want; i++) {
-      await seekTo(i * step);
-      const f = newFrame(Math.max(20, Math.round(step * 1000)));
+    const grab = () => {
+      const f = newFrame(delay);
       const c = f.layers[0].cv.getContext('2d');
-      const s = Math.min(W / v.videoWidth, H / v.videoHeight);
-      c.drawImage(v, (W - v.videoWidth * s) / 2, (H - v.videoHeight * s) / 2, v.videoWidth * s, v.videoHeight * s);
+      c.imageSmoothingEnabled = !pixelMode;
+      c.imageSmoothingQuality = 'high';
+      const sc = Math.min(W / v.videoWidth, H / v.videoHeight);
+      c.drawImage(v, (W - v.videoWidth * sc) / 2, (H - v.videoHeight * sc) / 2, v.videoWidth * sc, v.videoHeight * sc);
       made.push(f);
-      progress(.02 + .95 * (i + 1) / want, 'Sampling frame ' + (i + 1) + '/' + want + '…');
+      progress(.02 + .95 * made.length / want, 'Making frame ' + made.length + ' of ' + want + '…');
+    };
+    const seekTo = t => new Promise(res => {
+      let done = false;
+      const fire = () => { if (done) return; done = true; v.onseeked = null; res(); };
+      v.onseeked = fire;
+      setTimeout(fire, 2000);
+      v.currentTime = Math.min(t, dur - 0.001);
+    });
+    const canWatch = typeof v.requestVideoFrameCallback === 'function';
+    if (canWatch) {
+      await seekTo(0);
+      await new Promise(res => {
+        let next = 0;
+        const tick = (now, meta) => {
+          if (stopped || made.length >= want) { res(); return; }
+          const t = meta && isFinite(meta.mediaTime) ? meta.mediaTime : v.currentTime;
+          while (made.length < want && t + 0.0005 >= next * step) { grab(); next++; }
+          if (made.length >= want || v.ended) { res(); return; }
+          v.requestVideoFrameCallback(tick);
+        };
+        v.requestVideoFrameCallback(tick);
+        v.play().catch(() => res());
+        setTimeout(res, Math.max(8000, pl.span * 1000 * 1.6 + 4000));
+      });
+      v.pause();
+    }
+    for (let i = made.length; i < want && !stopped; i++) {
+      await seekTo(i * step);
+      grab();
       await maybeYield();
     }
+    if (stopped && !made.length) throw new Error('stopped before any frames were made');
     frames.push(...made);
     cur = frames.length - made.length;
     sel = -1; dirty = true;
     renderTimeline(); refreshAll();
     progress(-1);
-    toast('Sampled ' + made.length + ' frames from ' + file.name + ' at about ' + fps + ' fps.', 'good');
+    let same = 0;
+    for (let i = 1; i < made.length; i++) {
+      const a = made[i - 1].layers[0].cv.getContext('2d').getImageData(0, 0, W, H).data;
+      const bb = made[i].layers[0].cv.getContext('2d').getImageData(0, 0, W, H).data;
+      let diff = false;
+      for (let k = 0; k < a.length && !diff; k += 401) if (a[k] !== bb[k]) diff = true;
+      if (!diff) same++;
+    }
+    const extra = same > made.length * 0.08
+      ? ' ' + same + ' repeat, so this video has fewer frames per second than you asked for.' : '';
+    toast((stopped ? 'Stopped early, kept ' : 'Made ') + made.length + ' frames from ' + file.name +
+      ' at ' + fps.toFixed(1) + ' per second.' + extra, stopped ? '' : 'good');
   } catch (err) {
     progress(-1);
-    toast('Video import failed: ' + err.message, 'bad');
+    if (jobHalted(err)) toast('Stopped.');
+    else toast('Video import failed: ' + err.message, 'bad');
   } finally {
     URL.revokeObjectURL(url);
   }
 }
+$('vid-fps').oninput = vidSync;
+$('vid-max').oninput = vidSync;
+$('vid-part').onchange = vidSync;
+$('vid-go').onclick = vidRun;
+$('vid-cancel').onclick = vidClose;
 
 /* ============================================================== the divider */
 let tlHeight = 148;
@@ -6593,7 +6791,12 @@ $('cmd-input').onkeydown = e => {
 };
 const guard = (fn, label) => async () => {
   try { await fn(); }
-  catch (err) { console.error(err); progress(-1); toast(label + ' failed: ' + err.message, 'bad'); }
+  catch (err) {
+    progress(-1);
+    if (jobHalted(err)) { toast('Export stopped.'); return; }
+    console.error(err);
+    toast(label + ' failed: ' + err.message, 'bad');
+  }
 };
 $('btn-png').onclick = guard(exportPNG, 'PNG export');
 $('btn-sheet').onclick = guard(exportSheet, 'Sprite sheet');
@@ -6619,6 +6822,7 @@ window.addEventListener('keydown', e => {
     if ($('welcome').classList.contains('open')) { closeWelcome(); return; }
     if ($('cmdk').classList.contains('open')) { cmdClose(); return; }
     if ($('fx-modal').classList.contains('open')) { fxClose(); return; }
+    if ($('vid-modal').classList.contains('open')) { vidClose(); return; }
   }
 }, true);
 
