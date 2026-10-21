@@ -382,6 +382,23 @@ html.pixel .fr canvas{image-rendering:pixelated}
 #pixel-chars button{justify-content:flex-start;gap:7px;font-size:12.5px;padding:5px 7px}
 #pixel-chars canvas{width:22px;height:22px;image-rendering:pixelated;border-radius:4px;background:var(--panel2);flex:0 0 auto}
 
+#tilewrap{position:absolute;inset:0;pointer-events:none;display:none;z-index:1}
+#tilewrap.on{display:block}
+#tilewrap canvas{position:absolute;image-rendering:pixelated;opacity:.42}
+#pal-list{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+#pal-list button{width:24px;height:24px;padding:0;border-radius:5px;position:relative}
+#pal-list button.on{outline:2px solid var(--accent);outline-offset:1px}
+#pal-list .count{position:absolute;bottom:-2px;right:-2px;font-size:8px;background:var(--panel);border-radius:3px;padding:0 2px;color:var(--muted)}
+#sheet-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#sheet-prev{width:100%;max-height:220px;object-fit:contain;image-rendering:pixelated;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+
+#dropzone{position:fixed;inset:0;z-index:97;display:none;align-items:center;justify-content:center;
+  background:rgba(6,8,12,.6);backdrop-filter:blur(2px);pointer-events:none}
+#dropzone.on{display:flex}
+#dropzone .inner{display:flex;flex-direction:column;gap:6px;align-items:center;padding:28px 34px;border-radius:16px;
+  border:2px dashed var(--accent);background:var(--panel);font-size:17px;font-weight:700;color:var(--text)}
+#dropzone .inner span{font-size:12.5px;font-weight:400;color:var(--muted)}
+
 #busy{position:fixed;inset:0;z-index:98;display:none;align-items:center;justify-content:center;
   background:rgba(6,8,12,.55);backdrop-filter:blur(2px)}
 #busy.on{display:flex}
@@ -706,7 +723,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
     </div>
 
     <div class="viewport" id="viewport">
-      <div class="canvas-shell" id="shell"><canvas id="view" width="500" height="500"></canvas><div id="pxgrid"></div></div>
+      <div class="canvas-shell" id="shell"><div id="tilewrap"></div><canvas id="view" width="500" height="500"></canvas><div id="pxgrid"></div></div>
     </div>
 
     <div class="zoombar">
@@ -763,8 +780,15 @@ html.pixel .fr canvas{image-rendering:pixelated}
       <label class="row">Pixel grid <input type="checkbox" id="pixel-grid" checked title="Show the single-pixel grid once you zoom past 6x"></label>
       <p class="note">Canvas size</p>
       <div id="pixel-sizes"></div>
+      <label class="row">Tile preview <input type="checkbox" id="tile-on" title="Show the canvas repeated around the edges, so you can draw seamless patterns"></label>
       <p class="note">Drop in a character, already animated</p>
       <div id="pixel-chars"></div>
+      <h4>Colours in this frame</h4>
+      <div id="pal-list"></div>
+      <div class="grid2" style="margin-top:6px">
+        <button id="pal-refresh" title="Read the colours used in this frame">🎨 Read colours</button>
+        <button id="pal-replace" title="Swap every pixel of the chosen colour for the current colour">↷ Replace with current</button>
+      </div>
     </div>
     <div class="sec">
       <h3>🖼️ Canvas</h3>
@@ -872,7 +896,15 @@ html.pixel .fr canvas{image-rendering:pixelated}
       <label class="row">Background <input type="color" id="bg-color" value="#ffffff"></label>
       <div class="swatches" id="bg-presets" style="grid-template-columns:repeat(7,1fr)"></div>
       <label class="row">Transparent <input type="checkbox" id="bg-transparent"></label>
-      <label class="row">Loop forever <input type="checkbox" id="loop-forever" checked></label>
+      <label class="row">Loop <select id="loop-count" style="width:116px" title="How many times the GIF plays before it stops">
+        <option value="0">Forever</option>
+        <option value="1">Once</option>
+        <option value="2">Twice</option>
+        <option value="3">3 times</option>
+        <option value="5">5 times</option>
+        <option value="10">10 times</option>
+      </select></label>
+      <input type="checkbox" id="loop-forever" checked hidden>
       <label class="row">Max colors <select id="max-colors" style="width:96px">
         <option>256</option><option>128</option><option>64</option><option>32</option><option>16</option><option>8</option>
       </select></label>
@@ -894,6 +926,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
         <button id="btn-zip" data-member title="Save every frame as a separate PNG">📦 All frames</button>
         <button id="btn-webm" data-member title="Record the animation as a true-colour WebM video">🎥 WebM video</button>
       </div>
+      <button id="btn-copy-gif" style="width:100%;margin-top:6px" title="Copy the animation so you can paste it into a chat or a document">📋 Copy GIF</button>
       <button id="btn-apng" data-member style="width:100%;margin-top:6px" title="Animated PNG — lossless, every colour, real transparency">🌈 Animated PNG</button>
       <p class="note">GIF caps out at 256 colours; WebM keeps every one, and PNG frames are lossless.</p>
     </div>
@@ -935,6 +968,8 @@ html.pixel .fr canvas{image-rendering:pixelated}
 <input type="file" id="file-ref" accept="image/*" hidden>
 <input type="file" id="file-place" accept="image/*" multiple hidden>
 <input type="file" id="file-video" accept="video/*" hidden>
+<input type="file" id="file-sheet" accept="image/*" hidden>
+<input type="file" id="file-photo" accept="image/*" hidden>
 <div id="toasts" aria-live="polite"></div>
 
 <div class="modal" id="welcome">
@@ -956,6 +991,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
       </div>
       <div class="wcard" id="w-projects"><span class="big">🗂️</span><b>My projects</b><span id="w-projects-sub">Everything saved on this device</span></div>
       <div class="wcard" id="w-new"><span class="big">✨</span><b>New project</b><span>Start on a blank canvas</span></div>
+      <div class="wcard" id="w-photo"><span class="big">✨</span><b>Picture → GIF</b><span>Turn one photo into a moving GIF</span></div>
       <div class="wcard" id="w-pixel"><span class="big">🟦</span><b>Pixel art</b><span>A crisp 32 × 32 canvas, with characters ready to animate</span></div>
       <div class="wcard" id="w-import"><span class="big">📥</span><b>Import GIF or images</b><span>Open an existing animation, or a pile of stills</span></div>
       <div class="wcard" id="w-open"><span class="big">📂</span><b>Open project</b><span>A .json you saved from here before</span></div>
@@ -968,6 +1004,8 @@ html.pixel .fr canvas{image-rendering:pixelated}
   </div>
 </div>
 
+<div id="dropzone"><div class="inner">⬇️ Drop it here<span>Pictures, a GIF, a video or a saved project</span></div></div>
+
 <div id="busy" aria-live="polite">
   <div class="box">
     <div class="spin"></div>
@@ -975,6 +1013,51 @@ html.pixel .fr canvas{image-rendering:pixelated}
     <div class="sub" id="busy-sub"></div>
     <div class="track"><i id="busy-bar"></i></div>
     <button id="busy-stop" class="danger" hidden>Stop</button>
+  </div>
+</div>
+
+<div class="modal" id="sheet-modal">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Sprite sheet">
+    <h2>🎞️ Sprite sheet → frames</h2>
+    <p class="sub" id="sheet-about">—</p>
+    <div id="sheet-grid">
+      <label class="row">Across <input type="number" id="sheet-cols" min="1" max="64" value="4"></label>
+      <label class="row">Down <input type="number" id="sheet-rows" min="1" max="64" value="1"></label>
+    </div>
+    <label class="row" style="margin-top:6px">Skip empty cells <input type="checkbox" id="sheet-skip" checked></label>
+    <label class="row">Resize canvas to one cell <input type="checkbox" id="sheet-fit" checked></label>
+    <p class="note" id="sheet-note">—</p>
+    <img id="sheet-prev" alt="">
+    <div class="foot">
+      <button id="sheet-go" class="green">Slice into frames</button>
+      <button id="sheet-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="photo-modal">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Picture to GIF">
+    <h2>✨ Picture → GIF</h2>
+    <p class="sub" id="photo-about">—</p>
+    <div class="fx-row"><span>Movement</span>
+      <select id="photo-style">
+        <option value="kenburns">Pan &amp; zoom</option>
+        <option value="bounce">Bounce / wiggle</option>
+        <option value="sparkle">Sparkle / shine</option>
+        <option value="reveal">Fade &amp; reveal</option>
+        <option value="drag">Move it myself</option>
+      </select><span></span></div>
+    <div class="fx-row"><span>Seconds</span>
+      <input type="range" id="photo-secs" min="0.5" max="6" step="0.5" value="1.5">
+      <span id="photo-secs-val">1.5</span></div>
+    <div class="fx-row"><span>Frames per second</span>
+      <input type="range" id="photo-fps" min="4" max="30" step="1" value="12">
+      <span id="photo-fps-val">12</span></div>
+    <p class="note" id="photo-note">—</p>
+    <div class="foot">
+      <button id="photo-go" class="green">Make the GIF</button>
+      <button id="photo-cancel">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -1385,6 +1468,7 @@ function drawGrid() {
   vctx.restore();
 }
 function repaint(ghost) {
+  if ($('tile-on') && $('tile-on').checked) tileRender();
   vctx.setTransform(1, 0, 0, 1, 0, 0);
   vctx.clearRect(0, 0, W, H);
   if (!$('bg-transparent').checked) {
@@ -2732,17 +2816,24 @@ function buildPalette(imgs, maxColors, transparent) {
   // A palette needs at least two entries; anything less collapses the whole
   // image onto one averaged colour, which looks like a solid block.
   maxColors = Math.max(2, Math.min(256, maxColors | 0));
-  const hist = new Map();
+  const CUBES = 32768;
+  const hist = new Float64Array(CUBES);
+  const sumR = new Float64Array(CUBES), sumG = new Float64Array(CUBES), sumB = new Float64Array(CUBES);
   for (const im of imgs) {
     const d = im.data;
     for (let i = 0; i < d.length; i += 4) {
       if (transparent && d[i + 3] < 128) continue;
-      const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
-      hist.set(key, (hist.get(key) || 0) + 1);
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+      hist[key]++; sumR[key] += r; sumG[key] += g; sumB[key] += b;
     }
   }
   const entries = [];
-  hist.forEach((count, key) => entries.push({ r: (key >> 16) & 255, g: (key >> 8) & 255, b: key & 255, count }));
+  for (let key = 0; key < CUBES; key++) {
+    const count = hist[key];
+    if (!count) continue;
+    entries.push({ r: Math.round(sumR[key] / count), g: Math.round(sumG[key] / count), b: Math.round(sumB[key] / count), count });
+  }
   if (!entries.length) entries.push({ r: 0, g: 0, b: 0, count: 1 });
   if (entries.length <= maxColors) return entries.map(e => [e.r, e.g, e.b]);
 
@@ -2787,11 +2878,11 @@ function buildPalette(imgs, maxColors, transparent) {
 }
 
 function makeMapper(palette) {
-  const cache = new Map();
+  const lut = new Int16Array(32768).fill(-1);
   return (r, g, b) => {
-    const key = (r << 16) | (g << 8) | b;
-    const hit = cache.get(key);
-    if (hit !== undefined) return hit;
+    const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+    const hit = lut[key];
+    if (hit >= 0) return hit;
     let best = 0, bd = Infinity;
     for (let i = 0; i < palette.length; i++) {
       const p = palette[i];
@@ -2799,7 +2890,7 @@ function makeMapper(palette) {
       const d = dr * dr * 3 + dg * dg * 6 + db * db;
       if (d < bd) { bd = d; best = i; }
     }
-    cache.set(key, best);
+    lut[key] = best;
     return best;
   };
 }
@@ -2892,6 +2983,52 @@ function sameImage(a, b) {
   return true;
 }
 
+let copyingGif = false;
+function loopTimes() {
+  const n = +$('loop-count').value;
+  return isFinite(n) && n > 0 ? Math.min(65535, Math.round(n)) : 0;
+}
+async function copyGifToClipboard() {
+  if (!navigator.clipboard || !window.ClipboardItem) {
+    toast('This browser cannot copy images. Export the GIF and attach the file instead.', 'bad');
+    return;
+  }
+  const real = download;
+  let blob = null;
+  copyingGif = true;
+  try {
+    download = b => { blob = b; };
+    await exportGIF();
+  } finally {
+    download = real;
+    copyingGif = false;
+  }
+  if (!blob) return;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/gif': blob })]);
+    toast('GIF copied. Paste it straight into WhatsApp, Docs or anywhere else.', 'good');
+  } catch (err) {
+    try {
+      const png = await gifFirstFramePng(blob);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+      toast('This browser only allows copying still images, so the first frame was copied. Export the GIF for the animation.', '');
+    } catch (_) {
+      toast('Copying was blocked. Export the GIF and attach the file instead.', 'bad');
+    }
+  }
+}
+async function gifFirstFramePng(gifBlob) {
+  const dec = await decodeGIF(await gifBlob.arrayBuffer());
+  const cv = makeCanvas(dec.width, dec.height, true), c = cv.getContext('2d');
+  const f = dec.frames[0], img = c.createImageData(dec.width, dec.height);
+  for (let i = 0; i < f.indices.length; i++) {
+    const p = f.indices[i] * 3, k = i * 4;
+    img.data[k] = f.palette[p]; img.data[k + 1] = f.palette[p + 1];
+    img.data[k + 2] = f.palette[p + 2]; img.data[k + 3] = 255;
+  }
+  c.putImageData(img, 0, 0);
+  return await new Promise(res => cv.toBlob(res, 'image/png'));
+}
 async function exportGIF() {
   if (!guestExportOk()) return;
   stopPlay();
@@ -2957,7 +3094,7 @@ async function exportGIF() {
     out.b(p[0]); out.b(p[1]); out.b(p[2]);
   }
   out.b(0x21); out.b(0xFF); out.b(11); out.s('NETSCAPE2.0');
-  out.b(3); out.b(1); out.w($('loop-forever').checked ? 0 : 1); out.b(0);
+  out.b(3); out.b(1); out.w(loopTimes()); out.b(0);
 
   /* A GIF frame is a patch over its predecessor. When the frames are opaque we
      can therefore ship only the rectangle that actually changed and leave the
@@ -3025,6 +3162,7 @@ async function exportGIF() {
   progress(-1);
   sel = keep;
   repaint();
+  if (copyingGif) { dirty = false; return; }
   toast('Saved animation.gif — ' + (blob.size / 1024).toFixed(0) + ' KB, ' + imgs.length +
         (imgs.length === 1 ? ' frame.' : ' frames.') +
         (imgs.length < frames.length ? ' Merged ' + (frames.length - imgs.length) + ' identical frames.' : '') +
@@ -3914,8 +4052,56 @@ $('bg-color').oninput = () => { repaint(); frames.forEach((_, i) => drawThumb(i)
 $('bg-transparent').onchange = () => { repaint(); frames.forEach((_, i) => drawThumb(i)); };
 
 view.addEventListener('pointerleave', () => { if (!drawing) repaint(); });
+function openDroppedFiles(files) {
+  const list = [...files];
+  if (!list.length) return;
+  const proj = list.find(f => /\.json$/i.test(f.name));
+  if (proj) { loadProject(proj); return; }
+  const vid = list.find(f => /^video\//i.test(f.type) || /\.(mp4|webm|mov|m4v|ogv)$/i.test(f.name));
+  if (vid) { importVideo(vid); return; }
+  const sheet = list.find(f => /sheet|sprite|strip/i.test(f.name) && /^image\//i.test(f.type));
+  if (sheet) { openAsSheet(sheet); return; }
+  importImages(list);
+}
+function readImage(file) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error('that picture could not be read'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+async function openAsSheet(file) {
+  try { sheetOpen(await readImage(file), file.name); }
+  catch (err) { toast(err.message, 'bad'); }
+}
+async function openAsPhoto(file) {
+  try { photoOpen(await readImage(file), file.name); }
+  catch (err) { toast(err.message, 'bad'); }
+}
 view.addEventListener('dragover', e => e.preventDefault());
-view.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) importImages(e.dataTransfer.files); });
+view.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files.length) openDroppedFiles(e.dataTransfer.files); });
+let dragDepth = 0;
+window.addEventListener('dragover', e => {
+  if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return;
+  e.preventDefault();
+});
+window.addEventListener('dragenter', e => {
+  if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return;
+  dragDepth++;
+  $('dropzone').classList.add('on');
+});
+window.addEventListener('dragleave', () => {
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) $('dropzone').classList.remove('on');
+});
+window.addEventListener('drop', e => {
+  if (!e.dataTransfer || !e.dataTransfer.files.length) return;
+  e.preventDefault();
+  dragDepth = 0;
+  $('dropzone').classList.remove('on');
+  openDroppedFiles(e.dataTransfer.files);
+});
 
 window.addEventListener('keydown', e => {
   const t = e.target.tagName;
@@ -6323,6 +6509,7 @@ function newProject(w, h) {
   if (zoomIsFit) zoomFit();
 }
 $('w-new').onclick = () => startFreshProject();
+$('w-photo').onclick = () => { closeWelcome(); $('file-photo').click(); };
 $('w-pixel').onclick = () => {
   setPixelMode(true, true);
   startFreshProject(32, 32);
@@ -6531,7 +6718,7 @@ async function exportAPNG() {
   const actl = new Uint8Array(8);
   const av = new DataView(actl.buffer);
   av.setUint32(0, imgs.length);
-  av.setUint32(4, $('loop-forever').checked ? 0 : 1);
+  av.setUint32(4, loopTimes());
   parts.push(pngChunk('acTL', actl));
   let seq = 0;
   for (let i = 0; i < imgs.length; i++) {
@@ -6603,6 +6790,9 @@ const COMMANDS = [
   { g: 'View', n: 'Smaller timeline thumbnails', r: () => setTimelineSize(tlSize - 14) },
   { g: 'Frame', n: 'Ping-pong (bounce) the animation', r: pingPong },
   { g: 'Frame', n: 'Continue the selected object’s motion', r: () => continueMotion(+$('continue-n').value || 4) },
+  { g: 'Frame', n: 'Blend smoothly into the next drawing', r: () => smoothBetween(Math.max(1, Math.min(30, +$('tween-n').value || 4))) },
+  { g: 'View', n: 'Tile preview on or off', r: () => { $('tile-on').checked = !$('tile-on').checked; tileRender(); repaint(); } },
+  { g: 'File', n: 'Copy the GIF to the clipboard', r: () => $('btn-copy-gif').click() },
   { g: 'Frame', n: 'Tween into the next frame', r: () => tween(Math.max(1, Math.min(60, +$('tween-n').value || 4))) },
   { g: 'Frame', n: 'Play / stop', k: 'Space', r: togglePlay },
   { g: 'Frame', n: 'Apply this delay to every frame', r: () => { const d = Math.max(20, +$('delay').value || 120); frames.forEach(f => f.delay = d); dirty = true; refreshAll(); toast('Delay applied to all frames.'); } },
@@ -6655,6 +6845,8 @@ const COMMANDS = [
   { g: 'File', n: 'Import GIF or images…', r: () => $('file-img').click() },
   { g: 'File', n: 'Import a video as frames…', r: () => $('file-video').click() },
   { g: 'File', n: 'Load a reference image…', r: () => $('file-ref').click() },
+  { g: 'File', n: 'Sprite sheet → frames…', r: () => $('file-sheet').click() },
+  { g: 'File', n: 'Picture → GIF…', r: () => $('file-photo').click() },
   { g: 'File', n: 'Insert an image into this frame…', r: () => $('file-place').click() },
   { g: 'Frame', n: 'Copy selection to every frame', r: () => copySelToFrames('all') },
   { g: 'Frame', n: 'Copy selection to the next frame', r: () => copySelToFrames('next') },
@@ -6764,6 +6956,8 @@ $('fps-preset').onchange = e => { applyFPS(+e.target.value); e.target.value = ''
 $('play-speed').onchange = e => { playSpeed = +e.target.value || 1; if (playing) { stopPlay(); startPlay(); } };
 $('btn-video').onclick = () => $('file-video').click();
 $('file-video').onchange = e => { if (e.target.files[0]) importVideo(e.target.files[0]); e.target.value = ''; };
+$('file-sheet').onchange = e => { if (e.target.files[0]) openAsSheet(e.target.files[0]); e.target.value = ''; };
+$('file-photo').onchange = e => { if (e.target.files[0]) openAsPhoto(e.target.files[0]); e.target.value = ''; };
 $('grad-on').onchange = e => editSel(o => o.grad = e.target.checked);
 $('color2').oninput = e => editSel(o => o.color2 = e.target.value, 'color2');
 $('grad-angle').onchange = e => editSel(o => o.gradAngle = e.target.value);
@@ -6803,6 +6997,7 @@ $('btn-sheet').onclick = guard(exportSheet, 'Sprite sheet');
 $('btn-zip').onclick = guard(exportAllPNGs, 'Frame export');
 $('btn-webm').onclick = guard(exportWebM, 'WebM export');
 $('btn-apng').onclick = guard(exportAPNG, 'APNG export');
+$('btn-copy-gif').onclick = guard(copyGifToClipboard, 'Copy');
 
 /* Shortcuts that must work even while a panel field has focus. */
 window.addEventListener('keydown', e => {
@@ -6823,6 +7018,8 @@ window.addEventListener('keydown', e => {
     if ($('cmdk').classList.contains('open')) { cmdClose(); return; }
     if ($('fx-modal').classList.contains('open')) { fxClose(); return; }
     if ($('vid-modal').classList.contains('open')) { vidClose(); return; }
+    if ($('sheet-modal').classList.contains('open')) { sheetClose(); return; }
+    if ($('photo-modal').classList.contains('open')) { photoClose(); return; }
   }
 }, true);
 
@@ -7447,6 +7644,311 @@ function renderPixelChars() {
 }
 $('pixel-on').onchange = e => setPixelMode(e.target.checked, true);
 $('pixel-grid').onchange = updatePixelGrid;
+
+function tileRender() {
+  const wrap = $('tilewrap');
+  const on = $('tile-on').checked;
+  wrap.classList.toggle('on', on);
+  if (!on) { wrap.innerHTML = ''; return; }
+  if (wrap.childElementCount !== 8) {
+    wrap.innerHTML = '';
+    for (let i = 0; i < 8; i++) wrap.appendChild(document.createElement('canvas'));
+  }
+  const spots = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+  [...wrap.children].forEach((cv, i) => {
+    cv.width = W; cv.height = H;
+    cv.style.width = '100%'; cv.style.height = '100%';
+    cv.style.left = (spots[i][0] * 100) + '%';
+    cv.style.top = (spots[i][1] * 100) + '%';
+    const c = cv.getContext('2d');
+    c.clearRect(0, 0, W, H);
+    renderFrame(c, F());
+  });
+}
+$('tile-on').onchange = () => { tileRender(); repaint(); };
+
+let palColours = [], palPick = -1;
+function palRead() {
+  const d = fctx().getImageData(0, 0, W, H).data;
+  const counts = new Map();
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 8) continue;
+    const key = (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  palColours = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 64)
+    .map(([key, n]) => ({ key, n, hex: '#' + key.toString(16).padStart(6, '0') }));
+  palPick = -1;
+  palRender();
+}
+function palRender() {
+  const host = $('pal-list');
+  host.innerHTML = '';
+  if (!palColours.length) {
+    const p = document.createElement('p');
+    p.className = 'note';
+    p.textContent = 'Press Read colours to list what this frame uses.';
+    host.appendChild(p);
+    return;
+  }
+  palColours.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.style.background = c.hex;
+    b.title = c.hex + ' — ' + c.n.toLocaleString() + ' pixels. Click to pick it, then Replace.';
+    if (i === palPick) b.classList.add('on');
+    b.onclick = () => { palPick = i; setColor(c.hex); palRender(); };
+    host.appendChild(b);
+  });
+}
+function palReplace() {
+  if (palPick < 0 || !palColours[palPick]) { toast('Pick a colour from the list first.', 'bad'); return; }
+  const from = palColours[palPick];
+  const to = hexToRGB($('color').value);
+  const c = fctx();
+  const img = c.getImageData(0, 0, W, H), d = img.data;
+  const fr = (from.key >> 16) & 255, fg = (from.key >> 8) & 255, fb = from.key & 255;
+  let hit = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] < 8 || d[i] !== fr || d[i + 1] !== fg || d[i + 2] !== fb) continue;
+    d[i] = to[0]; d[i + 1] = to[1]; d[i + 2] = to[2]; hit++;
+  }
+  if (!hit) { toast('No pixels of that colour on this layer.', 'bad'); return; }
+  pushHistory();
+  c.putImageData(img, 0, 0);
+  commit();
+  palRead();
+  toast('Recoloured ' + hit.toLocaleString() + ' pixels.', 'good');
+}
+$('pal-refresh').onclick = palRead;
+$('pal-replace').onclick = palReplace;
+
+let sheetImg = null;
+function sheetSync() {
+  if (!sheetImg) return;
+  const cols = Math.max(1, +$('sheet-cols').value || 1), rows = Math.max(1, +$('sheet-rows').value || 1);
+  const cw = Math.floor(sheetImg.width / cols), ch = Math.floor(sheetImg.height / rows);
+  $('sheet-note').textContent = (cols * rows) + ' cells of ' + cw + ' × ' + ch + ' px.';
+}
+function sheetOpen(img, name) {
+  sheetImg = img;
+  $('sheet-about').textContent = name + ' — ' + img.width + ' × ' + img.height + ' px.';
+  const ratio = img.width / img.height;
+  let cols = Math.max(1, Math.min(64, Math.round(ratio))), rows = 1;
+  if (ratio < 0.95) { cols = 1; rows = Math.max(1, Math.min(64, Math.round(1 / ratio))); }
+  $('sheet-cols').value = cols;
+  $('sheet-rows').value = rows;
+  $('sheet-prev').src = img.src;
+  sheetSync();
+  $('sheet-modal').classList.add('open');
+}
+function sheetClose() { $('sheet-modal').classList.remove('open'); sheetImg = null; }
+function sheetSlice() {
+  if (!sheetImg) return;
+  const cols = Math.max(1, +$('sheet-cols').value || 1), rows = Math.max(1, +$('sheet-rows').value || 1);
+  const cw = Math.floor(sheetImg.width / cols), ch = Math.floor(sheetImg.height / rows);
+  if (cw < 1 || ch < 1) { toast('That many cells does not fit the picture.', 'bad'); return; }
+  stopPlay();
+  pushStruct();
+  if ($('sheet-fit').checked && (cw !== W || ch !== H)) resize(cw, ch, false);
+  const cell = makeCanvas(cw, ch, true), cc = cell.getContext('2d');
+  const made = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c0 = 0; c0 < cols; c0++) {
+      cc.clearRect(0, 0, cw, ch);
+      cc.imageSmoothingEnabled = false;
+      cc.drawImage(sheetImg, c0 * cw, r * ch, cw, ch, 0, 0, cw, ch);
+      const d = cc.getImageData(0, 0, cw, ch).data;
+      let any = false;
+      for (let i = 3; i < d.length && !any; i += 4) if (d[i] > 8) any = true;
+      if (!any && $('sheet-skip').checked) continue;
+      const f = newFrame(120);
+      const fc = f.layers[0].cv.getContext('2d');
+      fc.imageSmoothingEnabled = false;
+      const s = Math.min(W / cw, H / ch);
+      fc.drawImage(cell, (W - cw * s) / 2, (H - ch * s) / 2, cw * s, ch * s);
+      made.push(f);
+    }
+  }
+  if (!made.length) { toast('Every cell was empty.', 'bad'); return; }
+  frames.push(...made);
+  cur = frames.length - made.length;
+  sel = -1; dirty = true;
+  sheetClose();
+  renderTimeline(); refreshAll();
+  toast('Sliced into ' + made.length + (made.length === 1 ? ' frame.' : ' frames.'), 'good');
+}
+$('sheet-cols').oninput = sheetSync;
+$('sheet-rows').oninput = sheetSync;
+$('sheet-go').onclick = sheetSlice;
+$('sheet-cancel').onclick = sheetClose;
+
+let photoImg = null, photoPath = null;
+function photoSync() {
+  $('photo-secs-val').textContent = (+$('photo-secs').value).toFixed(1);
+  $('photo-fps-val').textContent = $('photo-fps').value;
+  const n = Math.max(2, Math.round(+$('photo-secs').value * +$('photo-fps').value));
+  const style = $('photo-style').value;
+  $('photo-note').textContent = style === 'drag'
+    ? n + ' frames. You will drag the picture across the canvas and it follows your path.'
+    : n + ' frames, looping.';
+}
+function photoOpen(img, name) {
+  photoImg = img;
+  $('photo-about').textContent = name + ' — ' + img.width + ' × ' + img.height + ' px.';
+  photoSync();
+  $('photo-modal').classList.add('open');
+}
+function photoClose() { $('photo-modal').classList.remove('open'); photoImg = null; }
+function photoDraw(c, img, t, style, seed) {
+  const base = Math.min(W / img.width, H / img.height);
+  c.save();
+  c.imageSmoothingEnabled = !pixelMode;
+  if (style === 'kenburns') {
+    const z = 1.06 + 0.12 * (0.5 - 0.5 * Math.cos(t * Math.PI * 2));
+    const dx = Math.sin(t * Math.PI * 2) * W * 0.04, dy = Math.cos(t * Math.PI * 2) * H * 0.03;
+    const s = base * z;
+    c.drawImage(img, (W - img.width * s) / 2 + dx, (H - img.height * s) / 2 + dy, img.width * s, img.height * s);
+  } else if (style === 'bounce') {
+    const s = base * (1 + 0.05 * Math.sin(t * Math.PI * 2));
+    const lift = Math.abs(Math.sin(t * Math.PI * 2)) * H * 0.05;
+    c.translate(W / 2, H / 2 - lift);
+    c.rotate(Math.sin(t * Math.PI * 2) * 0.06);
+    c.drawImage(img, -img.width * s / 2, -img.height * s / 2, img.width * s, img.height * s);
+  } else if (style === 'sparkle') {
+    const s = base;
+    c.drawImage(img, (W - img.width * s) / 2, (H - img.height * s) / 2, img.width * s, img.height * s);
+    const x = (t * 1.6 - 0.3) * W;
+    const g = c.createLinearGradient(x - W * 0.18, 0, x + W * 0.18, H);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.5, 'rgba(255,255,255,.55)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, W, H);
+    const rnd = smartRand(seed);
+    for (let i = 0; i < 7; i++) {
+      const px = rnd() * W, py = rnd() * H, ph = rnd();
+      const a = Math.max(0, Math.sin((t + ph) * Math.PI * 2));
+      if (a <= 0.05) continue;
+      const r = (2 + rnd() * 3) * a;
+      c.fillStyle = 'rgba(255,255,255,' + a.toFixed(2) + ')';
+      c.beginPath();
+      c.moveTo(px, py - r * 3); c.lineTo(px + r, py); c.lineTo(px, py + r * 3); c.lineTo(px - r, py);
+      c.closePath(); c.fill();
+    }
+  } else if (style === 'reveal') {
+    const s = base;
+    c.globalAlpha = Math.min(1, t * 2.2);
+    c.drawImage(img, (W - img.width * s) / 2, (H - img.height * s) / 2, img.width * s, img.height * s);
+    c.globalAlpha = 1;
+    const cut = Math.min(1, t * 1.4);
+    if (cut < 1) { c.fillStyle = $('bg-transparent').checked ? 'rgba(0,0,0,0)' : $('bg-color').value;
+      if (!$('bg-transparent').checked) c.fillRect(cut * W, 0, W, H); else c.clearRect(cut * W, 0, W, H); }
+  } else {
+    const s = base * 0.55;
+    const pt = photoPathAt(t);
+    c.drawImage(img, pt.x - img.width * s / 2, pt.y - img.height * s / 2, img.width * s, img.height * s);
+  }
+  c.restore();
+}
+function photoPathAt(t) {
+  const pts = photoPath && photoPath.length > 1 ? photoPath : [{ x: W * 0.3, y: H / 2 }, { x: W * 0.7, y: H / 2 }];
+  const f = Math.min(pts.length - 1.0001, Math.max(0, t * (pts.length - 1)));
+  const i = Math.floor(f), k = f - i;
+  const a = pts[i], b = pts[Math.min(pts.length - 1, i + 1)];
+  return { x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k };
+}
+async function photoRecordPath() {
+  photoPath = [];
+  const hint = $('hint');
+  const old = hint.textContent;
+  hint.textContent = 'Drag across the canvas to show the path, then let go.';
+  flash('Drag across the canvas to draw the path.');
+  await new Promise(res => {
+    let down = false;
+    const pos = e => {
+      const r = view.getBoundingClientRect();
+      return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height };
+    };
+    const onDown = e => { down = true; photoPath = [pos(e)]; e.preventDefault(); };
+    const onMove = e => { if (!down) return; const p = pos(e);
+      const last = photoPath[photoPath.length - 1];
+      if (!last || Math.hypot(p.x - last.x, p.y - last.y) > 3) photoPath.push(p); };
+    const onUp = () => {
+      if (!down) return;
+      down = false;
+      view.removeEventListener('pointerdown', onDown, true);
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      hint.textContent = old;
+      res();
+    };
+    view.addEventListener('pointerdown', onDown, true);
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onUp, true);
+  });
+}
+async function photoMake() {
+  if (!photoImg) return;
+  const img = photoImg, style = $('photo-style').value;
+  const secs = +$('photo-secs').value, fps = +$('photo-fps').value;
+  const n = Math.max(2, Math.round(secs * fps));
+  const delay = Math.max(20, Math.round(1000 / fps));
+  photoClose();
+  if (style === 'drag') {
+    await photoRecordPath();
+    if (!photoPath || photoPath.length < 2) { toast('No path drawn, so the picture just drifts across.', ''); }
+  }
+  stopPlay();
+  pushStruct();
+  progress(0.02, 'Making frames…');
+  const seed = 1234567;
+  const made = [];
+  for (let i = 0; i < n; i++) {
+    const t = i / n;
+    const f = newFrame(delay);
+    const c = f.layers[0].cv.getContext('2d');
+    photoDraw(c, img, t, style, seed);
+    made.push(f);
+    progress(.02 + .95 * (i + 1) / n, 'Making frame ' + (i + 1) + ' of ' + n + '…');
+    await maybeYield();
+  }
+  frames.push(...made);
+  cur = frames.length - made.length;
+  sel = -1; dirty = true;
+  progress(-1);
+  renderTimeline(); refreshAll();
+  toast('Made ' + made.length + ' frames. Press Play to see it, then Export GIF.', 'good');
+}
+$('photo-secs').oninput = photoSync;
+$('photo-fps').oninput = photoSync;
+$('photo-style').onchange = photoSync;
+$('photo-go').onclick = () => guard(photoMake, 'Picture to GIF')();
+$('photo-cancel').onclick = photoClose;
+
+function smoothBetween(steps) {
+  const a = F(), b = frames[cur + 1];
+  if (!b) { toast('Add a frame after this one to blend into.', 'bad'); return; }
+  const n = Math.max(1, Math.min(30, steps | 0));
+  stopPlay();
+  pushStruct();
+  const ca = makeCanvas(W, H, true), cb = makeCanvas(W, H, true);
+  renderFrame(ca.getContext('2d'), a);
+  renderFrame(cb.getContext('2d'), b);
+  const made = [];
+  for (let i = 1; i <= n; i++) {
+    const t = i / (n + 1);
+    const f = newFrame(a.delay);
+    const c = f.layers[0].cv.getContext('2d');
+    c.globalAlpha = 1; c.drawImage(ca, 0, 0);
+    c.globalAlpha = t; c.drawImage(cb, 0, 0);
+    c.globalAlpha = 1;
+    made.push(f);
+  }
+  frames.splice(cur + 1, 0, ...made);
+  dirty = true;
+  renderTimeline(); refreshAll();
+  toast('Blended ' + n + (n === 1 ? ' frame' : ' frames') + ' between this drawing and the next.', 'good');
+}
 
 /* ------------------------------------------------------------------ boot */
 frames.push(newFrame());
