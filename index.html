@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Frame Studio — GIF Editor</title>
+<title>GIFKI — GIF Editor</title>
 <meta name="description" content="Frame-by-frame animated GIF editor that runs entirely in your browser. Draw, animate and export GIFs — nothing is uploaded.">
 <meta name="theme-color" content="#0f1115">
-<meta property="og:title" content="Frame Studio — GIF Editor">
+<meta property="og:title" content="GIFKI — GIF Editor">
 <meta property="og:description" content="Draw frame-by-frame animations and export real GIFs, 100% in your browser.">
 <meta property="og:type" content="website">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='13' fill='%234c8dff'/%3E%3Crect x='9' y='13' width='46' height='38' rx='4' fill='%230f1115'/%3E%3Cg fill='%234c8dff'%3E%3Crect x='13' y='17' width='6' height='6' rx='1.6'/%3E%3Crect x='13' y='29' width='6' height='6' rx='1.6'/%3E%3Crect x='13' y='41' width='6' height='6' rx='1.6'/%3E%3Crect x='45' y='17' width='6' height='6' rx='1.6'/%3E%3Crect x='45' y='29' width='6' height='6' rx='1.6'/%3E%3Crect x='45' y='41' width='6' height='6' rx='1.6'/%3E%3C/g%3E%3Crect x='24' y='21' width='16' height='22' rx='2.5' fill='%238b5cf6'/%3E%3C/svg%3E">
@@ -460,6 +460,8 @@ html.pixel .fr canvas{image-rendering:pixelated}
   .timeline{max-height:34vh;overflow:auto}
 }
 
+#credit a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--line)}
+#credit a:hover{color:var(--text)}
 #restore-bar{display:none;align-items:center;gap:10px;margin:0 12px;padding:9px 12px;font-size:13px;
   background:#1e2a1f;border:1px solid #2f5133;border-left:3px solid var(--good);border-radius:8px}
 #restore-bar .grow{flex:1}
@@ -494,7 +496,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
 <body>
 
 <header>
-  <a class="brand" href="#" id="brand" title="About Frame Studio">
+  <a class="brand" href="#" id="brand" title="About GIFKI">
     <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
       <rect x="1" y="9" width="62" height="46" rx="7" class="film"/>
       <g class="holes">
@@ -503,7 +505,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
       </g>
       <rect class="cel" x="19" y="19" width="26" height="26" rx="4"/>
     </svg>
-    <span class="words"><b>FRAME STUDIO</b><i>GIF editing. Simplified.</i></span>
+    <span class="words"><b>GIFKI</b><i>by Kiaan Ganesh Shetty</i></span>
   </a>
   <span class="badge">offline · no libraries</span>
   <div class="finder">
@@ -961,7 +963,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
   <div class="timeline" id="timeline"></div>
 </div>
 
-<footer id="credit">A Kiaan Ganesh Shetty Creation · 2026 · 3 days in the making</footer>
+<footer id="credit">GIFKI — A Kiaan Ganesh Shetty Creation · <a href="privacy.html">Privacy</a> · <a href="copyright.html">Copyright</a> · © 2026 Kiaan Ganesh Shetty</footer>
 
 <input type="file" id="file-img" accept="image/*,.gif" multiple hidden>
 <input type="file" id="file-proj" accept="application/json,.json" hidden>
@@ -973,7 +975,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
 <div id="toasts" aria-live="polite"></div>
 
 <div class="modal" id="welcome">
-  <div class="sheet" role="dialog" aria-modal="true" aria-label="Welcome to Frame Studio">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Welcome to GIFKI">
     <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
       <rect x="1" y="9" width="62" height="46" rx="7" class="film"/>
       <g class="holes">
@@ -982,7 +984,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
       </g>
       <rect class="cel" x="19" y="19" width="26" height="26" rx="4"/>
     </svg>
-    <h1>FRAME STUDIO</h1>
+    <h1>GIFKI</h1>
     <p class="tag" id="w-hi" hidden></p>
     <p class="tag">Draw animated GIFs frame by frame. Everything runs in this tab — nothing is ever uploaded.</p>
     <div class="wcards">
@@ -1087,7 +1089,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
 
 <div class="modal" id="signin">
   <canvas id="si-bg" aria-hidden="true"></canvas>
-  <div class="sheet" role="dialog" aria-modal="true" aria-label="Sign in to Frame Studio">
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="Sign in to GIFKI">
     <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
       <rect x="1" y="9" width="62" height="46" rx="7" class="film"/>
       <g class="holes">
@@ -1096,7 +1098,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
       </g>
       <rect class="cel" x="19" y="19" width="26" height="26" rx="4"/>
     </svg>
-    <h1>FRAME STUDIO</h1>
+    <h1>GIFKI</h1>
     <form class="step on" id="si-email" novalidate>
       <p class="tag">Sign in with your email to start making GIFs.</p>
       <p class="why" id="si-why" hidden></p>
@@ -3685,7 +3687,7 @@ function saveProject() {
       }))
     }))
   };
-  download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'frame-studio-project.json');
+  download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'gifki-project.json');
   dirty = false;
   toast('Project saved.', 'good');
   saveState('');
@@ -3694,7 +3696,7 @@ function loadProject(file) {
   const fr = new FileReader();
   fr.onload = () => {
     let data;
-    try { data = JSON.parse(fr.result); } catch { toast('That is not a Frame Studio project file.', 'bad'); return; }
+    try { data = JSON.parse(fr.result); } catch { toast('That is not a GIFKI project file.', 'bad'); return; }
     if (!data.frames || !data.frames.length) { toast('That project has no frames in it.', 'bad'); return; }
     resize(data.w || 500, data.h || 500, false);
     undoStack.length = redoStack.length = 0;
