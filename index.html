@@ -775,7 +775,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
       </div>
     </div>
     <div class="sec">
-      <h3>🟦 Pixel art</h3>
+      <h3 data-member>🟦 Pixel art</h3>
       <label class="row">Pixel mode <input type="checkbox" id="pixel-on" title="Crisp pixels: no blurring when you zoom or export, plus a hard-edged pencil"></label>
       <label class="row">Pixel grid <input type="checkbox" id="pixel-grid" checked title="Show the single-pixel grid once you zoom past 6x"></label>
       <p class="note">Canvas size</p>
@@ -991,8 +991,8 @@ html.pixel .fr canvas{image-rendering:pixelated}
       </div>
       <div class="wcard" id="w-projects"><span class="big">🗂️</span><b>My projects</b><span id="w-projects-sub">Everything saved on this device</span></div>
       <div class="wcard" id="w-new"><span class="big">✨</span><b>New project</b><span>Start on a blank canvas</span></div>
-      <div class="wcard" id="w-photo"><span class="big">✨</span><b>Picture → GIF</b><span>Turn one photo into a moving GIF</span></div>
-      <div class="wcard" id="w-pixel"><span class="big">🟦</span><b>Pixel art</b><span>A crisp 32 × 32 canvas, with characters ready to animate</span></div>
+      <div class="wcard" id="w-photo"><span class="big">✨</span><b data-member>Picture → GIF</b><span>Turn one photo into a moving GIF</span></div>
+      <div class="wcard" id="w-pixel"><span class="big">🟦</span><b data-member>Pixel art</b><span>A crisp 32 × 32 canvas, with characters ready to animate</span></div>
       <div class="wcard" id="w-import"><span class="big">📥</span><b>Import GIF or images</b><span>Open an existing animation, or a pile of stills</span></div>
       <div class="wcard" id="w-open"><span class="big">📂</span><b>Open project</b><span>A .json you saved from here before</span></div>
     </div>
@@ -1105,8 +1105,9 @@ html.pixel .fr canvas{image-rendering:pixelated}
       <button type="button" class="linkish" id="si-guest">Continue as a guest</button>
       <p class="perks-h">Members get</p>
       <ul class="perks">
-        <li>✨ Smart select</li><li>🎨 Adjust &amp; filters</li><li>⇝ Tween &amp; motion</li>
-        <li>🎥 Video &amp; APNG</li><li>🎞️ Sprite sheets</li><li>♾️ Unlimited exports</li>
+        <li>🟦 Pixel art</li><li>✨ Picture → GIF</li><li>✨ Smart select</li>
+        <li>🎨 Adjust &amp; filters</li><li>⇝ Tween &amp; motion</li><li>🎥 Video &amp; APNG</li>
+        <li>🎞️ Sprite sheets</li><li>♾️ Unlimited exports</li>
       </ul>
       <p class="fine">Guests can draw with every other tool, import as much as they like, and export 10 times.</p>
     </form>
@@ -6517,8 +6518,9 @@ function newProject(w, h) {
   if (zoomIsFit) zoomFit();
 }
 $('w-new').onclick = () => startFreshProject();
-$('w-photo').onclick = () => { closeWelcome(); $('file-photo').click(); };
+$('w-photo').onclick = () => { if (needMember('photo')) return; closeWelcome(); $('file-photo').click(); };
 $('w-pixel').onclick = () => {
+  if (needMember('pixel')) return;
   setPixelMode(true, true);
   startFreshProject(32, 32);
   renderPixelSizes();
@@ -6854,7 +6856,7 @@ const COMMANDS = [
   { g: 'File', n: 'Import a video as frames…', r: () => $('file-video').click() },
   { g: 'File', n: 'Load a reference image…', r: () => $('file-ref').click() },
   { g: 'File', n: 'Sprite sheet → frames…', r: () => $('file-sheet').click() },
-  { g: 'File', n: 'Picture → GIF…', r: () => $('file-photo').click() },
+  { g: 'File', n: 'Picture → GIF…', r: () => { if (!needMember('photo')) $('file-photo').click(); } },
   { g: 'File', n: 'Insert an image into this frame…', r: () => $('file-place').click() },
   { g: 'Frame', n: 'Copy selection to every frame', r: () => copySelToFrames('all') },
   { g: 'Frame', n: 'Copy selection to the next frame', r: () => copySelToFrames('next') },
@@ -7061,7 +7063,8 @@ function authSave(a) {
 const GUEST_EXPORTS = 10;
 const MEMBER_FEATURES = {
   smart: 'Smart select', fx: 'Adjust & filter', tween: 'Tween', motion: 'Continue motion',
-  sheet: 'Sprite sheet export', zip: 'All-frames export', webm: 'WebM video export', apng: 'Animated PNG export'
+  sheet: 'Sprite sheet export', zip: 'All-frames export', webm: 'WebM video export', apng: 'Animated PNG export',
+  pixel: 'Pixel art', photo: 'Picture → GIF'
 };
 function isMember() { return !!authSession; }
 function guestMode() {
@@ -7455,6 +7458,7 @@ function authGate() {
 
 let pixelMode = false;
 function setPixelMode(on, remember) {
+  if (on && needMember('pixel')) { $('pixel-on').checked = false; return; }
   pixelMode = !!on;
   document.documentElement.classList.toggle('pixel', pixelMode);
   $('pixel-on').checked = pixelMode;
@@ -7593,6 +7597,7 @@ function pxRender(ch, i) {
   return cv;
 }
 function addPixelCharacter(id) {
+  if (needMember('pixel')) return;
   const ch = PIXEL_CHARS.find(c => c.id === id);
   if (!ch) return;
   stopPlay();
@@ -7626,6 +7631,7 @@ function renderPixelSizes() {
     b.title = n + ' by ' + n + ' pixels';
     if (W === n && H === n) b.classList.add('on');
     b.onclick = () => {
+      if (needMember('pixel')) return;
       if (!pixelMode) setPixelMode(true, true);
       resize(n, n, false);
       renderPixelSizes();
@@ -7673,10 +7679,14 @@ function tileRender() {
     renderFrame(c, F());
   });
 }
-$('tile-on').onchange = () => { tileRender(); repaint(); };
+$('tile-on').onchange = () => {
+  if ($('tile-on').checked && needMember('pixel')) { $('tile-on').checked = false; return; }
+  tileRender(); repaint();
+};
 
 let palColours = [], palPick = -1;
 function palRead() {
+  if (needMember('pixel')) return;
   const d = fctx().getImageData(0, 0, W, H).data;
   const counts = new Map();
   for (let i = 0; i < d.length; i += 4) {
@@ -7741,6 +7751,7 @@ function palApply(from, onlySel) {
     (sel ? ' inside the selection.' : '.'), 'good');
 }
 function palReplace() {
+  if (needMember('pixel')) return;
   if (palPick < 0 || !palColours[palPick]) { toast('Pick a colour from the list first.', 'bad'); return; }
   const from = palColours[palPick];
   const to = $('color').value;
@@ -7833,6 +7844,7 @@ function photoSync() {
     : n + ' frames, looping.';
 }
 function photoOpen(img, name) {
+  if (needMember('photo')) return;
   photoImg = img;
   $('photo-about').textContent = name + ' — ' + img.width + ' × ' + img.height + ' px.';
   photoSync();
