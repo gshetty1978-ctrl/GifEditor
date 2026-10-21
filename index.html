@@ -1151,6 +1151,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
     <p class="sub" id="confirm-body"></p>
     <div class="foot">
       <button id="confirm-no">Cancel</button>
+      <button id="confirm-alt" hidden></button>
       <button id="confirm-yes" class="danger">Delete</button>
     </div>
   </div>
@@ -5983,17 +5984,24 @@ async function migrateLegacy() {
 
 /* ================================================================ confirm */
 let confirmCb = null;
-function askConfirm(title, body, yesLabel, onYes) {
+let confirmAltCb = null;
+function askConfirm(title, body, yesLabel, onYes, altLabel, onAlt) {
   confirmCb = onYes;
+  confirmAltCb = onAlt || null;
   $('confirm-title').textContent = title;
   $('confirm-body').textContent = body;
   $('confirm-yes').textContent = yesLabel || 'Delete';
+  $('confirm-yes').classList.toggle('danger', !altLabel);
+  const alt = $('confirm-alt');
+  alt.hidden = !altLabel;
+  alt.textContent = altLabel || '';
   $('confirm').classList.add('open');
   setTimeout(() => $('confirm-no').focus(), 30);
 }
-function closeConfirm() { confirmCb = null; $('confirm').classList.remove('open'); }
+function closeConfirm() { confirmCb = null; confirmAltCb = null; $('confirm').classList.remove('open'); }
 $('confirm-no').onclick = closeConfirm;
 $('confirm-yes').onclick = () => { const fn = confirmCb; closeConfirm(); if (fn) fn(); };
+$('confirm-alt').onclick = () => { const fn = confirmAltCb; closeConfirm(); if (fn) fn(); };
 $('confirm').onclick = e => { if (e.target.id === 'confirm') closeConfirm(); };
 /* Cheap emptiness test: draw the frame small and look for any opaque pixel.
    A blank frame is not worth a dialog, and nagging about those is how people
@@ -7700,24 +7708,56 @@ function palRender() {
     host.appendChild(b);
   });
 }
-function palReplace() {
-  if (palPick < 0 || !palColours[palPick]) { toast('Pick a colour from the list first.', 'bad'); return; }
-  const from = palColours[palPick];
+function palCount(from) {
+  const d = fctx().getImageData(0, 0, W, H).data;
+  const fr = (from.key >> 16) & 255, fg = (from.key >> 8) & 255, fb = from.key & 255;
+  const sel = pixSelActive() ? pixSel.data : null;
+  let all = 0, inSel = 0;
+  for (let i = 0, k = 0; i < d.length; i += 4, k++) {
+    if (d[i + 3] < 8 || d[i] !== fr || d[i + 1] !== fg || d[i + 2] !== fb) continue;
+    all++;
+    if (sel && sel[k]) inSel++;
+  }
+  return { all, inSel };
+}
+function palApply(from, onlySel) {
   const to = hexToRGB($('color').value);
   const c = fctx();
   const img = c.getImageData(0, 0, W, H), d = img.data;
   const fr = (from.key >> 16) & 255, fg = (from.key >> 8) & 255, fb = from.key & 255;
+  const sel = onlySel && pixSelActive() ? pixSel.data : null;
   let hit = 0;
-  for (let i = 0; i < d.length; i += 4) {
+  for (let i = 0, k = 0; i < d.length; i += 4, k++) {
+    if (sel && !sel[k]) continue;
     if (d[i + 3] < 8 || d[i] !== fr || d[i + 1] !== fg || d[i + 2] !== fb) continue;
     d[i] = to[0]; d[i + 1] = to[1]; d[i + 2] = to[2]; hit++;
   }
-  if (!hit) { toast('No pixels of that colour on this layer.', 'bad'); return; }
+  if (!hit) { toast('Nothing of that colour there.', 'bad'); return; }
   pushHistory();
   c.putImageData(img, 0, 0);
   commit();
   palRead();
-  toast('Recoloured ' + hit.toLocaleString() + ' pixels.', 'good');
+  toast('Recoloured ' + hit.toLocaleString() + (hit === 1 ? ' pixel' : ' pixels') +
+    (sel ? ' inside the selection.' : '.'), 'good');
+}
+function palReplace() {
+  if (palPick < 0 || !palColours[palPick]) { toast('Pick a colour from the list first.', 'bad'); return; }
+  const from = palColours[palPick];
+  const to = $('color').value;
+  if (to.toLowerCase() === from.hex.toLowerCase()) { toast('That is already the colour. Pick a different one first.', 'bad'); return; }
+  const n = palCount(from);
+  if (!n.all) { toast('No pixels of that colour on this layer.', 'bad'); return; }
+  const title = 'Replace ' + from.hex + ' with ' + to + '?';
+  if (pixSelActive() && n.inSel) {
+    askConfirm(title,
+      n.inSel.toLocaleString() + ' of those pixels are inside your selection, ' +
+      n.all.toLocaleString() + ' in the whole frame. Which do you want to change?',
+      'Inside the selection', () => palApply(from, true),
+      'The whole frame', () => palApply(from, false));
+    return;
+  }
+  askConfirm(title, n.all.toLocaleString() + (n.all === 1 ? ' pixel' : ' pixels') + ' will change. You can undo this.',
+    'Replace', () => palApply(from, false));
 }
 $('pal-refresh').onclick = palRead;
 $('pal-replace').onclick = palReplace;
