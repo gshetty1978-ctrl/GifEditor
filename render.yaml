@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: frame-studio
+    name: gifki
     runtime: static
     staticPublishPath: .
     buildCommand: ""
+    autoDeployTrigger: commit
     headers:
       - path: /*
         name: X-Content-Type-Options
