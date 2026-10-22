@@ -273,6 +273,7 @@ html[data-theme="light"] .stage .viewport{--stagebg:#dbe0e9}
 #tl-head button{padding:2px 9px;line-height:1.1}
 #tl-head .readout{font-variant-numeric:tabular-nums;min-width:38px;text-align:center}
 #tl-head .hintish{margin-left:auto;opacity:.75}
+#tl-head #tl-hide{margin-left:8px}
 #statusbar{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;
   font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 #statusbar span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -352,6 +353,23 @@ html[data-theme="light"] button.danger:hover{background:#fbe6e6}
   border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:8px;padding:8px 10px;margin:4px 0 14px;font-size:13px}
 #signin .linkish{background:none;border:none;color:var(--muted);text-decoration:underline;margin-top:10px;font-size:13px}
 #signin .linkish:hover{color:var(--text)}
+body.beginner [data-pro]{display:none!important}
+body.beginner #rail-tools button{height:40px}
+body.beginner #rail-tools button i{font-size:20px}
+body.beginner #rail-tools button em{display:none}
+body.beginner .stage .toolbar button{padding:9px 13px;font-size:14px}
+body.beginner .panel{padding:13px}
+body.beginner #tools .grid2 button,body.beginner #tools .grid4 button{font-size:13.5px;padding:10px 8px}
+body.beginner .sec > h3{font-size:13px}
+body.beginner .hint{font-size:13.5px}
+body.beginner .wrap{grid-template-columns:52px 206px minmax(0,1fr) 196px}
+#btn-mode{font-weight:600}
+#w-mode .wcards{grid-template-columns:1fr 1fr}
+#w-mode .wcard{align-items:center;text-align:center;padding:20px 16px;gap:5px}
+#w-mode .wcard .big{font-size:30px}
+#w-mode .wcard b{font-size:16px}
+#w-mode-pro{border-color:var(--accent)}
+#w-mode-easy{border-color:var(--good)}
 .is-guest [data-member]::after{content:'✨';font-size:.8em;margin-left:3px}
 #signin .mark{width:56px;height:56px;margin:0 auto 8px;display:block}
 #signin .mark .film{fill:var(--panel2);stroke:var(--line);stroke-width:2}
@@ -455,6 +473,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
   html,body{overflow:hidden}
   body{display:flex;flex-direction:column}
   .wrap{flex:1;min-height:0;grid-template-rows:minmax(0,1fr) 9px auto var(--tlh,120px);align-items:stretch}
+  .wrap.no-timeline{grid-template-rows:minmax(0,1fr) 0 0 0}
   .wrap > .panel{overflow:auto;max-height:100%}
   .stage{height:100%}
   .viewport{flex:1;min-height:140px;max-height:none}
@@ -518,12 +537,13 @@ html.pixel .fr canvas{image-rendering:pixelated}
   <span class="pname" id="proj-name" title="Click to rename this project">Untitled</span>
   <span class="saving" id="save-state"></span>
   <div class="spacer"></div>
-  <button id="btn-rail-k" class="on" title="Show or hide the tool menu">🧰</button>
-  <button id="btn-rail-l" class="on" title="Show or hide the tool options">◧</button>
-  <button id="btn-rail-r" class="on" title="Show or hide the properties rail">◨</button>
+  <button id="btn-rail-k" class="on" data-pro title="Show or hide the tool menu">🧰</button>
+  <button id="btn-rail-l" class="on" data-pro title="Show or hide the tool options">◧</button>
+  <button id="btn-rail-r" class="on" data-pro title="Show or hide the properties rail">◨</button>
   <button id="btn-rail-t" class="on" title="Show or hide the timeline">▤</button>
-  <button id="btn-focus" title="Focus mode — hide both rails and the timeline (Tab)">⛶ Focus</button>
-  <button id="btn-cmdk" title="Command palette (Ctrl+K)">⌘ Commands</button>
+  <button id="btn-focus" data-pro title="Focus mode — hide both rails and the timeline (Tab)">⛶ Focus</button>
+  <button id="btn-cmdk" data-pro title="Command palette (Ctrl+K)">⌘ Commands</button>
+  <button id="btn-mode" title="Switch between the simple and the full layout">🛠️ Pro</button>
   <button id="btn-theme" title="Switch between dark and light">🌙 Dark</button>
   <button id="btn-undo" title="Undo (Ctrl+Z)">↶ Undo</button>
   <button id="btn-redo" title="Redo (Ctrl+Y)">↷ Redo</button>
@@ -546,8 +566,8 @@ html.pixel .fr canvas{image-rendering:pixelated}
   <nav id="rail-tools" aria-label="Tools">
     <button data-tool="brush" class="on" title="Brush — B"><i>🖌️</i><em>B</em></button>
     <button data-tool="eraser" title="Eraser — E"><i>🧽</i><em>E</em></button>
-    <button data-tool="spray" title="Airbrush — A"><i>💨</i><em>A</em></button>
-    <button data-tool="smudge" title="Smudge — S"><i>👉</i><em>S</em></button>
+    <button data-tool="spray" title="Airbrush — A" data-pro><i>💨</i><em>A</em></button>
+    <button data-tool="smudge" title="Smudge — S" data-pro><i>👉</i><em>S</em></button>
     <button data-tool="fill" title="Flood fill — G"><i>🪣</i><em>G</em></button>
     <hr>
     <button data-tool="line" title="Line — L"><i>📏</i><em>L</em></button>
@@ -556,14 +576,14 @@ html.pixel .fr canvas{image-rendering:pixelated}
     <button data-tool="text" title="Text — T"><i>🔤</i><em>T</em></button>
     <hr>
     <button data-tool="select" title="Select, move, resize and rotate — V"><i>🖱️</i><em>V</em></button>
-    <button data-tool="marquee" title="Select a rectangle of pixels — M"><i>▭</i><em>M</em></button>
-    <button data-tool="lasso" title="Freehand pixel selection — Q"><i>✎</i><em>Q</em></button>
-    <button data-tool="wand" title="Select every pixel of a similar colour — W"><i>🪄</i><em>W</em></button>
-    <button data-tool="smart" data-member title="Smart select — drag a box around a thing in a picture, or just click it. Shift adds, Alt removes — J"><i>✨</i><em>J</em></button>
+    <button data-tool="marquee" title="Select a rectangle of pixels — M" data-pro><i>▭</i><em>M</em></button>
+    <button data-tool="lasso" title="Freehand pixel selection — Q" data-pro><i>✎</i><em>Q</em></button>
+    <button data-tool="wand" title="Select every pixel of a similar colour — W" data-pro><i>🪄</i><em>W</em></button>
+    <button data-tool="smart" data-member data-pro title="Smart select — drag a box around a thing in a picture, or just click it. Shift adds, Alt removes — J"><i>✨</i><em>J</em></button>
     <hr>
     <button data-tool="eyedrop" title="Colour picker — I"><i>💧</i><em>I</em></button>
-    <button data-tool="crop" title="Crop the canvas — C"><i>✂</i><em>C</em></button>
-    <button data-tool="pan" title="Pan the canvas — H"><i>✋</i><em>H</em></button>
+    <button data-tool="crop" title="Crop the canvas — C" data-pro><i>✂</i><em>C</em></button>
+    <button data-tool="pan" title="Pan the canvas — H" data-pro><i>✋</i><em>H</em></button>
   </nav>
 
   <!-- LEFT -->
@@ -574,16 +594,16 @@ html.pixel .fr canvas{image-rendering:pixelated}
       <input type="range" id="smooth" min="0" max="90" value="0" title="Steadies a shaky hand on brush and eraser strokes">
       <label class="row">Fill tolerance <span id="tol-val" style="color:var(--text)">24</span></label>
       <input type="range" id="tol" min="0" max="160" value="24" title="How different a pixel may be and still count as the same colour, for both Fill and the Wand">
-      <label class="row">Wand: contiguous only <input type="checkbox" id="wand-contig" checked title="On: only the patch you click. Off: every matching pixel on the layer."></label>
-      <label class="row">Wand: any colour <input type="checkbox" id="wand-opaque" title="Grab the whole drawn shape whatever colours are in it, rather than matching one colour. Shift-click does the same."></label>
+      <label class="row" data-pro>Wand: contiguous only <input type="checkbox" id="wand-contig" checked title="On: only the patch you click. Off: every matching pixel on the layer."></label>
+      <label class="row" data-pro>Wand: any colour <input type="checkbox" id="wand-opaque" title="Grab the whole drawn shape whatever colours are in it, rather than matching one colour. Shift-click does the same."></label>
       <h4>Actions</h4>
       <div class="grid2">
-        <button id="btn-flatten" title="Bake shapes and text into pixels">🔒 Flatten</button>
+        <button id="btn-flatten" data-pro title="Bake shapes and text into pixels">🔒 Flatten</button>
         <button id="btn-onion" title="Show neighbouring frames as a ghost">🧅 Onion</button>
         <button id="btn-place-img" title="Drop a picture into this frame as a movable object">🖼️ Insert image</button>
-        <button id="btn-frame-copy" title="Copy everything on this frame's layer to other frames">⧉ Frame to…</button>
+        <button id="btn-frame-copy" data-pro title="Copy everything on this frame's layer to other frames">⧉ Frame to…</button>
       </div>
-      <h4>Symmetry</h4>
+      <h4 data-pro>Symmetry</h4>
       <div class="grid4">
         <button id="sym-off" class="on" title="No mirroring">∅</button>
         <button id="sym-x" title="Mirror left ↔ right">⇔</button>
@@ -657,9 +677,9 @@ html.pixel .fr canvas{image-rendering:pixelated}
         <button id="mode-fill" class="on">Filled</button>
         <button id="mode-stroke">Outline</button>
       </div>
-      <label class="row" style="margin-top:8px">Gradient <input type="checkbox" id="grad-on" title="Fill shapes and text with a two-colour blend"></label>
-      <label class="row">Second colour <input type="color" id="color2" value="#8b5cf6"></label>
-      <label class="row">Angle <select id="grad-angle" style="width:104px">
+      <label class="row" data-pro style="margin-top:8px">Gradient <input type="checkbox" id="grad-on" title="Fill shapes and text with a two-colour blend"></label>
+      <label class="row" data-pro>Second colour <input type="color" id="color2" value="#8b5cf6"></label>
+      <label class="row" data-pro>Angle <select id="grad-angle" style="width:104px">
         <option value="0">→ Left to right</option>
         <option value="90">↓ Top to bottom</option>
         <option value="45">↘ Diagonal</option>
@@ -667,7 +687,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
       </select></label>
       <label class="row" style="margin-top:10px">Opacity <span id="alpha-val" style="color:var(--text)">100%</span></label>
       <input type="range" id="alpha" min="5" max="100" value="100">
-      <label class="row" style="margin-top:8px">Pen pressure <input type="checkbox" id="pressure-on" checked title="A stylus varies stroke width and opacity with how hard you press. Ignored by a mouse."></label>
+      <label class="row" data-pro style="margin-top:8px">Pen pressure <input type="checkbox" id="pressure-on" checked title="A stylus varies stroke width and opacity with how hard you press. Ignored by a mouse."></label>
     </div>
 
     <div class="sec" id="text-panel" style="display:none">
@@ -678,17 +698,17 @@ html.pixel .fr canvas{image-rendering:pixelated}
         <button id="bold-btn">B Bold</button>
         <button id="italic-btn"><i>I</i> Italic</button>
       </div>
-      <label class="row" style="margin-top:8px">Outline <input type="number" id="txt-stroke" value="0" min="0" max="40" style="width:70px" title="Width of an outline drawn around the letters"></label>
-      <label class="row">Outline colour <input type="color" id="txt-stroke-color" value="#000000"></label>
-      <label class="row">Shadow <input type="number" id="txt-shadow" value="0" min="0" max="60" style="width:70px" title="Softness of a drop shadow"></label>
-      <label class="row">Shadow colour <input type="color" id="txt-shadow-color" value="#000000"></label>
+      <label class="row" data-pro style="margin-top:8px">Outline <input type="number" id="txt-stroke" value="0" min="0" max="40" style="width:70px" title="Width of an outline drawn around the letters"></label>
+      <label class="row" data-pro>Outline colour <input type="color" id="txt-stroke-color" value="#000000"></label>
+      <label class="row" data-pro>Shadow <input type="number" id="txt-shadow" value="0" min="0" max="60" style="width:70px" title="Softness of a drop shadow"></label>
+      <label class="row" data-pro>Shadow colour <input type="color" id="txt-shadow-color" value="#000000"></label>
       <input type="text" id="font-search" placeholder="🔎 Search fonts…" style="margin-top:8px">
       <div class="fonts" id="font-list"></div>
       <p class="note">Click the canvas to place the text.</p>
     </div>
 
     <div class="sec">
-      <button id="btn-flatten2" style="width:100%">🔒 Flatten shapes into pixels</button>
+      <button id="btn-flatten2" data-pro style="width:100%">🔒 Flatten shapes into pixels</button>
       <button id="btn-clear" class="danger" style="width:100%;margin-top:6px">🗑️ Clear this frame</button>
     </div>
   </div>
@@ -700,13 +720,13 @@ html.pixel .fr canvas{image-rendering:pixelated}
       <button id="btn-dup">📋 Duplicate</button>
       <button id="btn-play" class="primary">▶️ Play</button>
       <label class="row" style="margin:0">Delay <input type="number" id="delay" value="120" min="20" step="10" style="width:78px"> ms</label>
-      <button id="btn-delay-all" title="Apply this delay to every frame">↔ all</button>
+      <button id="btn-delay-all" data-pro title="Apply this delay to every frame">↔ all</button>
       <select id="fps-preset" style="width:104px" title="Set every frame's delay from a frame rate">
         <option value="">FPS preset…</option>
         <option value="8">8 fps</option><option value="12">12 fps</option><option value="15">15 fps</option>
         <option value="24">24 fps</option><option value="30">30 fps</option><option value="50">50 fps</option>
       </select>
-      <select id="play-speed" style="width:92px" title="Preview speed. Does not change the exported timing.">
+      <select id="play-speed" data-pro style="width:92px" title="Preview speed. Does not change the exported timing.">
         <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
         <option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
       </select>
@@ -768,10 +788,10 @@ html.pixel .fr canvas{image-rendering:pixelated}
       <div id="statusbar">
         <span id="st-frame">Frame 1 / 1</span>
         <span id="st-size">500 × 500</span>
-        <span id="st-fps">8.3 fps</span>
-        <span id="st-len">0.12s</span>
-        <span id="st-layers">1 layer</span>
-        <span id="st-zoom">100%</span>
+        <span id="st-fps" data-pro>8.3 fps</span>
+        <span id="st-len" data-pro>0.12s</span>
+        <span id="st-layers" data-pro>1 layer</span>
+        <span id="st-zoom" data-pro>100%</span>
         <span id="st-tool">Brush</span>
         <span id="st-export">No export yet</span>
         <span class="hint" id="hint">Brush selected — draw on the canvas.</span>
@@ -824,7 +844,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
         <button id="tr-rotl" title="Rotate the whole project 90° left">↺ 90°</button>
         <button id="tr-rotr" title="Rotate the whole project 90° right">↻ 90°</button>
       </div>
-      <label class="row" style="margin-top:8px">Applies to <select id="tr-scope" style="width:118px">
+      <label class="row" data-pro style="margin-top:8px">Applies to <select id="tr-scope" style="width:118px">
         <option value="layer">This layer</option>
         <option value="frame" selected>This frame</option>
         <option value="all">Every frame</option>
@@ -908,19 +928,19 @@ html.pixel .fr canvas{image-rendering:pixelated}
         <option value="10">10 times</option>
       </select></label>
       <input type="checkbox" id="loop-forever" checked hidden>
-      <label class="row">Max colors <select id="max-colors" style="width:96px">
+      <label class="row" data-pro>Max colors <select id="max-colors" style="width:96px">
         <option>256</option><option>128</option><option>64</option><option>32</option><option>16</option><option>8</option>
       </select></label>
       <label class="row">Scale <select id="export-scale" style="width:96px">
         <option value="16">1600%</option><option value="8">800%</option><option value="4">400%</option><option value="2">200%</option>
         <option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.25">25%</option>
       </select></label>
-      <label class="row">Dither <select id="dither" style="width:118px" title="Trades a little noise for far smoother gradients at low colour counts">
+      <label class="row" data-pro>Dither <select id="dither" style="width:118px" title="Trades a little noise for far smoother gradients at low colour counts">
         <option value="none">Off</option>
         <option value="fs">Floyd–Steinberg</option>
         <option value="ordered">Ordered (8×8)</option>
       </select></label>
-      <label class="row">Skip identical <input type="checkbox" id="dedupe" checked title="Merge runs of identical frames into one longer frame"></label>
+      <label class="row" data-pro>Skip identical <input type="checkbox" id="dedupe" checked title="Merge runs of identical frames into one longer frame"></label>
       <div class="grid2" style="margin-top:8px">
         <button id="btn-png" title="Save the current frame as a PNG">🖼️ PNG frame</button>
         <button id="btn-sheet" data-member title="Save every frame side by side in one PNG">🎞️ Sprite sheet</button>
@@ -960,6 +980,7 @@ html.pixel .fr canvas{image-rendering:pixelated}
     <span class="readout" id="tl-zoom">84px</span>
     <button id="tl-in" title="Bigger thumbnails">+</button>
     <span class="hintish">Drag a frame to reorder · right-click for more</span>
+    <button id="tl-hide" title="Hide the timeline — T brings it back">✕ Hide</button>
   </div>
   <div class="timeline" id="timeline"></div>
 </div>
@@ -987,6 +1008,17 @@ html.pixel .fr canvas{image-rendering:pixelated}
     </svg>
     <h1>GIFKI</h1>
     <p class="tag" id="w-hi" hidden></p>
+    <div id="w-mode">
+      <p class="tag">First — how much do you want on screen?</p>
+      <div class="wcards">
+        <div class="wcard" id="w-mode-pro"><span class="big">🛠️</span><b>Professional</b>
+          <span>Everything: all 18 tools, layers, tween, symmetry, filters and the full export panel.</span></div>
+        <div class="wcard" id="w-mode-easy"><span class="big">🎈</span><b>Beginner</b>
+          <span>Just drawing and frames. Bigger buttons, the fiddly settings tucked away.</span></div>
+      </div>
+      <p class="note" style="text-align:center">You can switch whenever you like — there is a button for it in the top bar.</p>
+    </div>
+    <div id="w-main">
     <p class="tag">Draw animated GIFs frame by frame. Everything runs in this tab — nothing is ever uploaded.</p>
     <div class="wcards">
       <div class="wcard resume" id="w-resume" style="display:none">
@@ -1002,7 +1034,9 @@ html.pixel .fr canvas{image-rendering:pixelated}
     <div class="wsizes" id="w-sizes"></div>
     <div class="wfoot">
       <label><input type="checkbox" id="w-skip"> Skip this next time</label>
+      <button id="w-mode-back" title="Choose the simple or the full layout again">↺ Change layout</button>
       <button id="w-close">Straight to the editor →</button>
+    </div>
     </div>
   </div>
 </div>
@@ -1204,6 +1238,7 @@ let W = view.width, H = view.height;
 const $ = id => document.getElementById(id);
 const frames = [];                 // {cv, objs:[], delay, thumb, el}
 let cur = 0, sel = -1;             // sel = index into current frame's objs
+const EASY_TOOLS = ['brush', 'eraser', 'fill', 'line', 'rect', 'ellipse', 'text', 'select', 'eyedrop'];
 let tool = 'brush', shape = null, styleMode = 'fill';
 let playing = false, playTimer = null, onion = false;
 let selectedFont = 'Arial', bold = false, italic = false;
@@ -2152,6 +2187,10 @@ function stopPlay() {
 /* ------------------------------------------------------------ tool setup */
 function setTool(t, sh) {
   if (t === 'smart' && needMember('smart')) return;
+  if (!sh && document.body.classList.contains('beginner') && !EASY_TOOLS.includes(t)) {
+    toast('That tool lives in the full layout. Switch with the button in the top bar.', 'bad');
+    return;
+  }
   if (typeof pixFloat !== 'undefined' && pixFloat && t !== tool) dropPixels();
   if (t !== 'marquee' && t !== 'lasso' && t !== 'wand' && t !== 'smart' && typeof pixSel !== 'undefined' && pixSel) setPixSelMask(null);
   tool = t; shape = sh || null;
@@ -6402,7 +6441,7 @@ $('vid-cancel').onclick = vidClose;
 
 /* ============================================================== the divider */
 let tlHeight = 120;
-function tlAutoHeight() { return tlSize + 44; }
+function tlAutoHeight() { return tlSize + 64; }
 function tlPinned() { try { return !!localStorage.getItem('fs-tlh'); } catch (_) { return false; } }
 function setTimelineHeight(px, remember) {
   const max = Math.max(90, window.innerHeight - 300);
@@ -6521,6 +6560,7 @@ function openWelcome() {
   } else {
     $('w-resume').style.display = 'none';
   }
+  welcomeShowMode(!uiModeSaved());
   $('w-skip').checked = welcomeSkipped();
   $('w-hi').hidden = !authSession;
   if (authSession) $('w-hi').textContent = 'Hi ' + authSession.name + '! 👋';
@@ -6818,6 +6858,8 @@ const COMMANDS = [
   { g: 'Frame', n: 'Next frame', k: '.', r: () => selectFrame(cur + 1) },
   { g: 'Frame', n: 'Previous frame', k: ',', r: () => selectFrame(cur - 1) },
   { g: 'Frame', n: 'Reverse frame order', r: reverseFrames },
+  { g: 'View', n: 'Simple layout (beginner)', r: () => setUIMode('easy', true) },
+  { g: 'View', n: 'Full layout (professional)', r: () => setUIMode('pro', true) },
   { g: 'View', n: 'Bigger timeline thumbnails', r: () => setTimelineSize(tlSize + 14) },
   { g: 'View', n: 'Smaller timeline thumbnails', r: () => setTimelineSize(tlSize - 14) },
   { g: 'Frame', n: 'Ping-pong (bounce) the animation', r: pingPong },
@@ -7001,6 +7043,7 @@ $('lay-share').onclick = () => setLayerShared(!L().shared);
 $('sel-tonext').onclick = () => copySelToFrames('next');
 $('sel-toall').onclick = () => copySelToFrames('all');
 $('sel-fit').onclick = fitSelToCanvas;
+$('tl-hide').onclick = () => toggleRail('timeline');
 $('tl-in').onclick = () => setTimelineSize(tlSize + 14);
 $('tl-out').onclick = () => setTimelineSize(tlSize - 14);
 $('btn-reverse').onclick = reverseFrames;
@@ -8035,6 +8078,56 @@ renderPixelChars();
 try { if (localStorage.getItem('fs-pixel') === '1') setPixelMode(true, false); } catch (_) {}
 initSections();
 buildFindIndex();
+
+/* ============================================================== ui modes */
+const PRO_SECTION_TITLES = ['Layers', 'Reference image', 'Shortcuts', 'Pixel art'];
+let uiMode = 'pro';
+function markProParts() {
+  ['btn-tween', 'tween-n', 'tween-ease'].forEach(id => { const e = $(id); if (e) e.setAttribute('data-pro', ''); });
+  document.querySelectorAll('.wrap > .panel .sec > h3').forEach(h => {
+    const t = h.textContent.replace(/\s+/g, ' ').trim();
+    if (PRO_SECTION_TITLES.some(n => t.indexOf(n) >= 0)) h.parentElement.setAttribute('data-pro', '');
+  });
+  document.querySelectorAll('.stage .toolbar > span:empty').forEach(sp => sp.setAttribute('data-pro', ''));
+}
+function uiModeSaved() {
+  try { return localStorage.getItem('fs-uimode'); } catch (_) { return null; }
+}
+function setUIMode(m, remember) {
+  uiMode = m === 'easy' ? 'easy' : 'pro';
+  const easy = uiMode === 'easy';
+  document.body.classList.toggle('beginner', easy);
+  const b = $('btn-mode');
+  b.textContent = easy ? '\u{1F388} Simple' : '\u{1F6E0}\uFE0F Pro';
+  b.title = easy ? 'Simple layout \u2014 click for every tool' : 'Full layout \u2014 click for the simple one';
+  if (easy) {
+    if (!EASY_TOOLS.includes(tool)) setTool('brush');
+    if (!railState.left || !railState.right || !railState.rail) {
+      railState.left = railState.right = railState.rail = true;
+      railState.focusPrev = null;
+      applyRails();
+    }
+  }
+  if (remember) { try { localStorage.setItem('fs-uimode', uiMode); } catch (_) {} }
+  if (zoomIsFit) setTimeout(zoomFit, 40);
+}
+function welcomeShowMode(show) {
+  $('w-mode').hidden = !show;
+  $('w-main').hidden = show;
+}
+function pickUIMode(m) {
+  setUIMode(m, true);
+  welcomeShowMode(false);
+  toast(m === 'easy' ? 'Simple layout. The full set of tools is one click away in the top bar.'
+                     : 'Full layout \u2014 every tool is on.', 'good');
+}
+markProParts();
+$('w-mode-pro').onclick = () => pickUIMode('pro');
+$('w-mode-easy').onclick = () => pickUIMode('easy');
+$('w-mode-back').onclick = () => welcomeShowMode(true);
+$('btn-mode').onclick = () => setUIMode(uiMode === 'easy' ? 'pro' : 'easy', true);
+setUIMode(uiModeSaved() || 'pro', false);
+
 try { setTimelineSize(+localStorage.getItem('fs-tlsize') || 72); } catch (_) { setTimelineSize(72); }
 try { setTimelineHeight(+localStorage.getItem('fs-tlh') || tlAutoHeight(), false); } catch (_) { setTimelineHeight(tlAutoHeight(), false); }
 applyRails();
