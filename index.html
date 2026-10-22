@@ -357,7 +357,7 @@ body.beginner [data-pro]{display:none!important}
 body.beginner #rail-tools button{height:40px}
 body.beginner #rail-tools button i{font-size:20px}
 body.beginner #rail-tools button em{display:none}
-body.beginner .stage .toolbar button{padding:9px 13px;font-size:14px}
+body.beginner .stage .toolbar button{padding:8px 10px;font-size:13.5px}
 body.beginner .panel{padding:13px}
 body.beginner #tools .grid2 button,body.beginner #tools .grid4 button{font-size:13.5px;padding:10px 8px}
 body.beginner .sec > h3{font-size:13px}
@@ -742,7 +742,9 @@ html.pixel .fr canvas{image-rendering:pixelated}
       <span style="width:1px;height:22px;background:var(--line)"></span>
       <button id="btn-reverse" title="Reverse the whole frame order">⇋ Reverse</button>
       <button id="btn-pingpong" title="Append the animation played backwards, for a seamless bounce">⇄ Ping-pong</button>
-      <span class="badge" id="anim-info" title="Total length of the animation">—</span>
+      <span style="width:1px;height:22px;background:var(--line)"></span>
+      <button id="btn-photo-bar" class="violet" data-member title="Turn one picture into a moving GIF">✨ Picture → GIF</button>
+      <span class="badge" id="anim-info" data-pro title="Total length of the animation">—</span>
     </div>
 
     <div class="viewport" id="viewport">
@@ -6591,6 +6593,7 @@ $('w-pixel').onclick = () => {
   if (sec) { setSectionOpen(sec, true, false); revealSection(sec); }
   toast('Pixel art: a 32 x 32 canvas with crisp pixels. Pick a character from the Pixel art panel.', 'good');
 };
+$('btn-photo-bar').onclick = () => { if (!needMember('photo')) $('file-photo').click(); };
 $('w-import').onclick = () => { closeWelcome(); $('file-img').click(); };
 $('w-open').onclick = () => { closeWelcome(); $('file-proj').click(); };
 $('w-close').onclick = closeWelcome;
