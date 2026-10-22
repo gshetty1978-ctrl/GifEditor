@@ -45,7 +45,38 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 label.row{display:flex;align-items:center;gap:8px;justify-content:space-between;margin:8px 0;color:var(--muted)}
-input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=range]{--p:0%;width:100%;height:22px;margin:0;padding:0;cursor:pointer;
+  background:none;-webkit-appearance:none;appearance:none}
+input[type=range]:focus{outline:none}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent2) 0%,var(--accent) var(--p),var(--panel2) var(--p),var(--panel2) 100%);
+  box-shadow:inset 0 0 0 1px var(--line);transition:background .09s linear,box-shadow .16s}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;
+  width:16px;height:16px;margin-top:-5px;border-radius:50%;background:#fff;border:2px solid var(--accent);
+  box-shadow:0 1px 4px rgba(0,0,0,.45);
+  transition:transform .16s cubic-bezier(.34,1.6,.64,1),box-shadow .16s,border-color .16s}
+input[type=range]:hover::-webkit-slider-runnable-track{box-shadow:inset 0 0 0 1px var(--accent)}
+input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.18);
+  box-shadow:0 0 0 6px rgba(76,141,255,.17),0 1px 4px rgba(0,0,0,.45)}
+input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 6px rgba(76,141,255,.34)}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.32);border-color:var(--accent2);
+  box-shadow:0 0 0 10px rgba(76,141,255,.24),0 1px 4px rgba(0,0,0,.45)}
+input[type=range]:active::-webkit-slider-runnable-track{transition:none}
+input[type=range]::-moz-range-track{height:6px;border-radius:99px;background:var(--panel2);
+  box-shadow:inset 0 0 0 1px var(--line)}
+input[type=range]::-moz-range-progress{height:6px;border-radius:99px;
+  background:linear-gradient(90deg,var(--accent2),var(--accent))}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border:2px solid var(--accent);border-radius:50%;
+  background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.45);
+  transition:transform .16s cubic-bezier(.34,1.6,.64,1),box-shadow .16s,border-color .16s}
+input[type=range]:hover::-moz-range-thumb{transform:scale(1.18);box-shadow:0 0 0 6px rgba(76,141,255,.17)}
+input[type=range]:active::-moz-range-thumb{transform:scale(1.32);border-color:var(--accent2);
+  box-shadow:0 0 0 10px rgba(76,141,255,.24)}
+input[type=range]:disabled{opacity:.4;cursor:not-allowed}
+input[type=range]:disabled::-webkit-slider-thumb{transform:none;box-shadow:none}
+body.beginner input[type=range]{height:26px}
+body.beginner input[type=range]::-webkit-slider-runnable-track{height:8px}
+body.beginner input[type=range]::-webkit-slider-thumb{width:20px;height:20px;margin-top:-6px}
 input[type=color]{width:44px;height:30px;padding:0;border:1px solid var(--line);border-radius:6px;background:none;cursor:pointer}
 input[type=text],input[type=number],textarea,select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:7px 8px;font:inherit;width:100%}
 textarea{resize:vertical;min-height:56px}
@@ -1828,6 +1859,7 @@ function drawThumb(i) {
 }
 function refreshAll() {
   repaint();
+  paintRanges();
   frames.forEach((f, i) => {
     if (!f.el) return;
     f.el.classList.toggle('sel', i === cur);
@@ -4397,6 +4429,7 @@ function fxOpen() {
   if (needMember('fx')) return;
   if (!frames.length) return;
   fxReset();
+  paintRanges();
   $('fx-modal').classList.add('open');
 }
 function fxClose() {
@@ -6259,6 +6292,7 @@ function syncScrub() {
   if (document.activeElement !== s) s.value = cur;
   s.disabled = frames.length < 2;
   $('scrub-lbl').textContent = (cur + 1) + ' / ' + frames.length;
+  paintRange(s);
 }
 $('scrub').oninput = e => {
   const i = Math.max(0, Math.min(frames.length - 1, +e.target.value));
@@ -8131,6 +8165,22 @@ $('w-mode-back').onclick = () => welcomeShowMode(true);
 $('btn-mode').onclick = () => setUIMode(uiMode === 'easy' ? 'pro' : 'easy', true);
 setUIMode(uiModeSaved() || 'pro', false);
 
+
+/* ------------------------------------------------------------- sliders */
+/* WebKit cannot fill the part of the track behind the thumb on its own, so
+   every range carries its position as --p and the track paints a gradient. */
+function paintRange(el) {
+  const min = +el.min || 0;
+  const max = el.max === '' ? 100 : +el.max;
+  const span = max - min;
+  const v = +el.value;
+  el.style.setProperty('--p', (span > 0 ? Math.max(0, Math.min(100, (v - min) / span * 100)) : 0) + '%');
+}
+function paintRanges() { document.querySelectorAll('input[type=range]').forEach(paintRange); }
+document.addEventListener('input', e => {
+  if (e.target && e.target.type === 'range') paintRange(e.target);
+}, true);
+paintRanges();
 try { setTimelineSize(+localStorage.getItem('fs-tlsize') || 72); } catch (_) { setTimelineSize(72); }
 try { setTimelineHeight(+localStorage.getItem('fs-tlh') || tlAutoHeight(), false); } catch (_) { setTimelineHeight(tlAutoHeight(), false); }
 applyRails();
